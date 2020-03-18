@@ -61,12 +61,13 @@ int main(int argc, char *argv[]){
 	char	    serverName[] = "127.0.0.1"; 								//Adreça IP on està el servidor
 	int			sockAddrSize;
 	int			sFd;
-	//int			mlen;
+	int 		indic = 0;
 	int 		result;
 	char		buffer[256];
 	char 		input;
 	
 	INICI:
+	indic = 0;
 	
 	/*Crear el socket*/
 	sFd=socket(AF_INET,SOCK_STREAM,0);
@@ -88,7 +89,6 @@ int main(int argc, char *argv[]){
 	printf("\nConnexió establerta amb el servidor: adreça %s, port %d\n",	inet_ntoa(serverAddr.sin_addr), ntohs(serverAddr.sin_port));
 	
 	ImprimirMenu();
-	
 	input = getchar();
 
 		switch (input)															//Switch case pel menu de selecció
@@ -146,18 +146,23 @@ int main(int argc, char *argv[]){
 				
 			default:
 				printf("Opció incorrecta\n");
-				break;
+				strcpy (buffer,"ERROR");
+				indic = 1;
+				
 		}
-
+	
 		input = getchar();
 	
+	if (indic!=1)
+	{
+		/*Rebre*/
+		result = read(sFd, buffer, 256);
+		printf("Missatge rebut del servidor(bytes %d): %s\n", result, buffer);
 
-	/*Rebre*/
-	result = read(sFd, buffer, 256);
-	printf("Missatge rebut del servidor(bytes %d): %s\n", result, buffer);
-
-	close(sFd);
-	goto INICI;
+	}
 	
+		close(sFd);
+		goto INICI;
+
 	return 0;
 	}
