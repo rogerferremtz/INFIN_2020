@@ -35,7 +35,35 @@
 #define SERVER_MAX_CONNECTIONS	4
 
 #define REQUEST_MSG_SIZE	1024
+void clampTofour(char str2Clamp[4]){
+    char tempString[4];
+    switch(strlen(str2Clamp)){
+        case 1:
+            strcpy(tempString,str2Clamp);
+            str2Clamp[0] ='0';
+            str2Clamp[1] ='0';
+            str2Clamp[2] ='0';
+            strcat(str2Clamp,tempString);
+            break;
+        case 2:
+            strcpy(tempString,str2Clamp);
+            str2Clamp[0] ='0';
+            str2Clamp[1] ='0';
+            strcat(str2Clamp,tempString);
+            break;
+        case 3:
+            strcpy(tempString,str2Clamp);
+            str2Clamp[0] ='0';
+            strcat(str2Clamp,tempString);
+            break;
+        case 4:
+            break;
+        default:
+            strcpy(str2Clamp,"Ovrf");
+            break;
 
+    }
+}
 
 /************************
 *
@@ -59,10 +87,15 @@ int main(int argc, char *argv[])
     char        tempsstr[3];
     char        nummosstr[3];
     int         nummos = 0;
-    int         valorTemp = 25000;
-    char        valorTempstr[5];
+    int         valorTempAnt = 25000;
+    char        valorTempAntstr[5];
     int         bufferlen = 0;
-
+    char        valorTempMaxstr[5];
+    int         valorTempMax = 30500;
+    char        valorTempMinstr[5];
+    int         valorTempMin = 19700;
+    int         contadorDades = 23;
+    char        contadorDadesstr[4];
     /*Preparar l'adreça local*/
     sockAddrSize=sizeof(struct sockaddr_in);
     bzero ((char *)&serverAddr, sockAddrSize); //Posar l'estructura a zero
@@ -102,6 +135,7 @@ int main(int argc, char *argv[])
 
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                            result = close(newFd);
                                 break;
                         case '1':
                             strcpy(nummosstr,"000");
@@ -118,39 +152,97 @@ int main(int argc, char *argv[])
                             strcpy(buffer,"{M0}\n");
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n El temps es: %d i el numero de mostres: %d\n",	result, buffer,temps, nummos);
+                            result = close(newFd);
                                 break;
                         default:
                             strcpy(buffer,"{M1}\n");
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, missatge);
+                            result = close(newFd);
                                 break;
                         }
                         break;
                 case 'U':
                     memset(missatge,0,strlen(missatge));
-                    printf("%d\n",valorTemp);
-                    sprintf(valorTempstr,"%d",valorTemp);
-                    printf("Valor de la temp: %s\n",valorTempstr);
+                    printf("%d\n",valorTempAnt);
+                    sprintf(valorTempAntstr,"%d",valorTempAnt);
+                    printf("Valor de la temp: %s\n",valorTempAntstr);
                     strcpy(missatge,"{U0");
-                    strcat(missatge,valorTempstr);
+                    strcat(missatge,valorTempAntstr);
                     strcat(missatge,"}\n");
                     printf("%s\n",missatge);
                     memset(buffer,0,strlen(buffer));
                     strcpy(buffer,missatge);
                     result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
                     printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    result = close(newFd);
 
                     break;
-                    case 'X':
-                        break;
-                    case 'Y':
-                        break;
-                    case 'R':
-                        break;
-                    case 'B':
-                        break;
-                    default:
-                        break;
+                case 'X':
+                    memset(missatge,0,strlen(missatge));
+                    printf("%d\n",valorTempMax);
+                    sprintf(valorTempMaxstr,"%d",valorTempMax);
+                    printf("Valor de la temp: %s\n",valorTempMaxstr);
+                    strcpy(missatge,"{X0");
+                    strcat(missatge,valorTempMaxstr);
+                    strcat(missatge,"}\n");
+                    printf("%s\n",missatge);
+                    memset(buffer,0,strlen(buffer));
+                    strcpy(buffer,missatge);
+                    result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
+                    printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    result = close(newFd);
+                    break;
+                case 'Y':
+                    memset(missatge,0,strlen(missatge));
+                    printf("%d\n",valorTempMin);
+                    sprintf(valorTempMinstr,"%d",valorTempMin);
+                    printf("Valor de la temp: %s\n",valorTempMinstr);
+                    strcpy(missatge,"{Y0");
+                    strcat(missatge,valorTempMinstr);
+                    strcat(missatge,"}\n");
+                    printf("%s\n",missatge);
+                    memset(buffer,0,strlen(buffer));
+                    strcpy(buffer,missatge);
+                    result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
+                    printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    result = close(newFd);
+                     break;
+                case 'R':
+                    memset(missatge,0,strlen(missatge));
+                    strcpy(missatge,"{R0}\n");
+                    memset(buffer,0,strlen(buffer));
+                    strcpy(buffer,missatge);
+                    result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
+                    printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    result = close(newFd);
+                    break;
+                case 'B':
+                    sprintf(contadorDadesstr,"%d",contadorDades);
+                    clampTofour(contadorDadesstr);
+                    printf("valor: %s \n",contadorDadesstr);
+                   // printf("String: %s\tNum %d\t longitud string %d\n",contadorDadesstr,contadorDades,strlen(contadorDadesstr));
+                    memset(missatge,0,strlen(missatge));
+                    strcpy(missatge,"{B0");
+                    missatge[strlen(missatge)] = contadorDadesstr[0];
+                    missatge[strlen(missatge)] = contadorDadesstr[1];
+                    missatge[strlen(missatge)] = contadorDadesstr[2];
+                    missatge[strlen(missatge)] = contadorDadesstr[3];
+                    strcat(missatge,"}\n");
+                    memset(buffer,0,strlen(buffer));
+                    strcpy(buffer,missatge);
+                    result = write(newFd, buffer, strlen(buffer)+1);
+                    printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    result = close(newFd);
+                     break;
+                default:
+                    strcpy(buffer, "{E1}\n");
+                    result = write(newFd, buffer, strlen(buffer) + 1); //+1 per enviar el 0 final de cadena
+                    printf("L'instruccio rebuda no es reconeix\n");
+                    strcpy(missatge, "Error en l'instruccio\n");
+                    printf("Missatge enviat a client(bytes %d): %s\n", result, missatge);
+                    result = close(newFd);
+                    break;
                     }
 
             }
@@ -160,6 +252,7 @@ int main(int argc, char *argv[])
             printf("L'estructura del missatge rebut no es reconeix\n");
             strcpy(missatge, "Error en l'estructura\n");
             printf("Missatge enviat a client(bytes %d): %s\n", result, missatge);
+            result = close(newFd);
         }
 
         /*Enviar*/
