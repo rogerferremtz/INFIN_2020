@@ -131,13 +131,15 @@ int main(int argc, char *argv[])
                 case 'M':
                     switch(buffer[2]){
                         case '0':
+                            memset(buffer,0,strlen(buffer));
                             strcpy(buffer,"{M0}\n");
-
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
                             result = close(newFd);
                                 break;
                         case '1':
+                            memset(missatge,0,strlen(missatge));
+                            memset(buffer,0,strlen(buffer));
                             strcpy(nummosstr,"000");
                             strcpy(tempsstr,"000");
                             tempsstr[0]='0';
@@ -155,6 +157,7 @@ int main(int argc, char *argv[])
                             result = close(newFd);
                                 break;
                         default:
+                            memset(buffer,0,strlen(buffer));
                             strcpy(buffer,"{M1}\n");
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, missatge);
