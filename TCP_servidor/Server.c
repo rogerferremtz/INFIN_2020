@@ -132,14 +132,15 @@ int main(int argc, char *argv[])
                     switch(buffer[2]){
                         case '0':
                             memset(buffer,0,strlen(buffer));
-                            strcpy(buffer,"{M0}\n");
+                            memset(missatge,0,strlen(missatge));
+                            strcpy(missatge,"{M0}\n");
+                            strcpy(buffer,missatge);
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
                             result = close(newFd);
                                 break;
                         case '1':
                             memset(missatge,0,strlen(missatge));
-                            memset(buffer,0,strlen(buffer));
                             strcpy(nummosstr,"000");
                             strcpy(tempsstr,"000");
                             tempsstr[0]='0';
@@ -151,7 +152,10 @@ int main(int argc, char *argv[])
                             nummosstr[2]=buffer[5];
                             printf("Numero de mostres %s\n",nummosstr);
                             nummos = atoi(nummosstr);
-                            strcpy(buffer,"{M0}\n");
+                            memset(buffer,0,strlen(buffer));
+                            memset(missatge,0,strlen(missatge));
+                            strcpy(missatge,"{M0}\n");
+                            strcpy(buffer,missatge);
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n El temps es: %d i el numero de mostres: %d\n",	result, buffer,temps, nummos);
                             result = close(newFd);
@@ -227,11 +231,12 @@ int main(int argc, char *argv[])
                    // printf("String: %s\tNum %d\t longitud string %d\n",contadorDadesstr,contadorDades,strlen(contadorDadesstr));
                     memset(missatge,0,strlen(missatge));
                     strcpy(missatge,"{B0");
-                    missatge[strlen(missatge)] = contadorDadesstr[0];
-                    missatge[strlen(missatge)] = contadorDadesstr[1];
-                    missatge[strlen(missatge)] = contadorDadesstr[2];
-                    missatge[strlen(missatge)] = contadorDadesstr[3];
+                    missatge[3] = contadorDadesstr[0];
+                    missatge[4] = contadorDadesstr[1];
+                    missatge[5] = contadorDadesstr[2];
+                    missatge[6] = contadorDadesstr[3];
                     strcat(missatge,"}\n");
+                    printf("Missatge %s\n",missatge);
                     memset(buffer,0,strlen(buffer));
                     strcpy(buffer,missatge);
                     result = write(newFd, buffer, strlen(buffer)+1);
