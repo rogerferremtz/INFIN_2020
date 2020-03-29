@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
                                 break;
                         default:
                             memset(buffer,0,strlen(buffer));
+                            memset(missatge,0,strlen(missatge));
                             strcpy(buffer,"{M1}\n");
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
                             printf("Missatge enviat a client(bytes %d): %s\n",	result, missatge);
@@ -235,7 +236,8 @@ int main(int argc, char *argv[])
                     missatge[4] = contadorDadesstr[1];
                     missatge[5] = contadorDadesstr[2];
                     missatge[6] = contadorDadesstr[3];
-                    strcat(missatge,"}\n");
+                    missatge[7] = '}';
+                    missatge[8] = '\n';
                     printf("Missatge %s\n",missatge);
                     memset(buffer,0,strlen(buffer));
                     strcpy(buffer,missatge);
@@ -257,8 +259,8 @@ int main(int argc, char *argv[])
         else if  (buffer[0] != '{' || buffer[bufferlen-1] != '}') {
             strcpy(buffer, "{E2}\n");
             result = write(newFd, buffer, strlen(buffer) + 1); //+1 per enviar el 0 final de cadena
-            printf("L'estructura del missatge rebut no es reconeix\n");
-            strcpy(missatge, "Error en l'estructura\n");
+            //printf("L'estructura del missatge rebut no es reconeix\n");
+            //strcpy(missatge, "Error en l'estructura\n");
             printf("Missatge enviat a client(bytes %d): %s\n", result, missatge);
             result = close(newFd);
         }
