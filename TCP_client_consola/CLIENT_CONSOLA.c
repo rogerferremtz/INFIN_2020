@@ -159,6 +159,28 @@ int main(int argc, char *argv[]){
 		result = read(sFd, buffer, 256);
 		printf("Missatge rebut del servidor(bytes %d): %s\n", result, buffer);
 
+		Switch (buffer[1])
+		{
+            		case 'U':
+               		   	printf("La mostra més antiga és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7];
+               			break;
+               	
+			case 'X':
+			    	printf("La mostra màxima és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7];
+			    	break;
+			    
+			case 'Y':
+			    	printf("La mostra mínima és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7];
+		            	break;
+		        
+		        case 'B':
+		            	printf("El nombre de mostres emmagatzemades són: %c%c%c%c%c \n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7];
+		        	break;
+		        
+		    	default:
+		        	break;
+		}	
+
 	}
 	
 		close(sFd);
