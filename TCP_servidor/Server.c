@@ -30,40 +30,67 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <time.h>
 #define SERVER_PORT_NUM		5001
 #define SERVER_MAX_CONNECTIONS	4
 
 #define REQUEST_MSG_SIZE	1024
 void clampTofour(char str2Clamp[4]){
-    char tempString[4];
+    char tempString[4]="0000";
+    strcpy(tempString,str2Clamp);
+
     switch(strlen(str2Clamp)){
         case 1:
-            strcpy(tempString,str2Clamp);
+            memset(str2Clamp,0,strlen(str2Clamp));
             str2Clamp[0] ='0';
             str2Clamp[1] ='0';
             str2Clamp[2] ='0';
-            strcat(str2Clamp,tempString);
+            str2Clamp[3]=tempString[0];
             break;
         case 2:
-            strcpy(tempString,str2Clamp);
+            memset(str2Clamp,0,strlen(str2Clamp));
             str2Clamp[0] ='0';
             str2Clamp[1] ='0';
             strcat(str2Clamp,tempString);
             break;
         case 3:
-            strcpy(tempString,str2Clamp);
+            memset(str2Clamp,0,strlen(str2Clamp));
             str2Clamp[0] ='0';
             strcat(str2Clamp,tempString);
             break;
         case 4:
             break;
         default:
-            strcpy(str2Clamp,"Ovrf");
+            //strcpy(str2Clamp,"Ovrf");
             break;
-
     }
 }
+
+int max(int a[],int n){
+    int i,min,max;
+    min=max=a[0];
+    for(i=1; i<n; i++){
+
+        if(max<a[i])
+            max=a[i];
+    }
+    // printf("maximum of array is : %d\n",max);
+    return(max);
+}
+
+int min(int a[],int n){
+    int i,min,max;
+    min=a[0];
+    for(i=1; i<n; i++)
+    {
+        if(min>a[i])
+            min=a[i];
+
+    }
+    // printf("minimum of array is : %d\n",min);
+    return(min);
+}
+
 
 /************************
 *
@@ -72,6 +99,38 @@ void clampTofour(char str2Clamp[4]){
 *
 *
 */
+int addDecimal(char str2Format[5]){
+    char textBuffer[5];
+    if(strlen(str2Format) == 4){
+        textBuffer[0] = str2Format[2];
+        textBuffer[1] = str2Format[3];
+        str2Format[2] = '.';
+        str2Format[3] = textBuffer[0];
+        str2Format[4] = textBuffer[1];
+    }
+    if(strlen(str2Format) == 3){
+        textBuffer[0] = '0';
+        textBuffer[1] = str2Format[0];
+        textBuffer[2] = '.';
+        textBuffer[3] = str2Format[1];
+        textBuffer[4] = str2Format[2];
+        memset(str2Format,0,strlen(str2Format));
+        strcpy(str2Format,textBuffer);
+    }
+}
+
+int lenHelper(unsigned x) {
+    if (x >= 1000000000) return 10;
+    if (x >= 100000000)  return 9;
+    if (x >= 10000000)   return 8;
+    if (x >= 1000000)    return 7;
+    if (x >= 100000)     return 6;
+    if (x >= 10000)      return 5;
+    if (x >= 1000)       return 4;
+    if (x >= 100)        return 3;
+    if (x >= 10)         return 2;
+    return 1;
+}
 
 int main(int argc, char *argv[])
 {
@@ -87,15 +146,59 @@ int main(int argc, char *argv[])
     char        tempsstr[3];
     char        nummosstr[3];
     int         nummos = 0;
-    int         valorTempAnt = 25000;
     char        valorTempAntstr[5];
     int         bufferlen = 0;
     char        valorTempMaxstr[5];
-    int         valorTempMax = 30500;
+    int         tempMax = 0;
     char        valorTempMinstr[5];
-    int         valorTempMin = 19700;
+    int         tempMin = 0;
     int         contadorDades = 23;
     char        contadorDadesstr[4];
+    int i = 0;
+    int c = 0;
+    char textbuffer,number[5];
+    int temperatures[100];
+    int numMostres = 0;
+    int cursor = 0;
+    int modifier = 0;
+    int val = 0;
+    time_t t;
+    char nummstring[5];
+    int pointer = 0;
+    int numval = 0;
+    int leng = 0;
+    char textbufferstr[5];
+    int index = 0;
+    int overflow = 0;
+    int cursorOVerflow = 0;
+    srand((unsigned) time(&t));
+    //FILE *fp;
+    //fp = fopen("temperatures.txt","r+");
+    //fseek(fp,0,SEEK_END);
+   // cursor = ftell(fp);
+    //numMostres = cursor/5;
+    //printf("Numero de mostres: %d\n",numMostres);
+
+    /*while(i < numMostres){
+        fseek(fp,5*i,SEEK_SET);
+        textbuffer = fgetc(fp);
+        number[0]=textbuffer;
+        while(c<4){
+            textbuffer = fgetc(fp);
+            number[c+1] =textbuffer;
+            c++;
+        }
+        temperatures[i] = atoi(number);
+        //printf("%d\n",temperatures[i]);
+
+        i++;
+        c=0;
+    }
+     */
+
+    //i = 0;
+    //fclose(fp);
+
     /*Preparar l'adreça local*/
     sockAddrSize=sizeof(struct sockaddr_in);
     bzero ((char *)&serverAddr, sockAddrSize); //Posar l'estructura a zero
@@ -113,6 +216,10 @@ int main(int argc, char *argv[])
     result = listen(sFd, SERVER_MAX_CONNECTIONS);
 
     /*Bucle s'acceptació de connexions*/
+
+
+
+
     while(1){
         printf("\nServidor esperant connexions\n");
 
@@ -140,6 +247,7 @@ int main(int argc, char *argv[])
                             result = close(newFd);
                                 break;
                         case '1':
+
                             memset(missatge,0,strlen(missatge));
                             strcpy(nummosstr,"000");
                             strcpy(tempsstr,"000");
@@ -158,6 +266,20 @@ int main(int argc, char *argv[])
                             strcpy(buffer,missatge);
                             result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena
                             printf("Missatge enviat a client(bytes %d): %s\n El temps es: %d i el numero de mostres: %d\n",	result, buffer,temps, nummos);
+
+                            for( i = 0 ; i < nummos ; i++ ) {
+                                val = (rand() % 10000);
+                                temperatures[(i+index)%100] = val;
+                            }
+
+                            index += nummos;
+                                numMostres = index;
+
+                            if (overflow == 1 && index >= modifier){
+                                modifier = index;
+                            }
+                            tempMax = max(temperatures,numMostres);
+                            tempMin = min(temperatures,numMostres);
                             result = close(newFd);
                                 break;
                         default:
@@ -172,26 +294,43 @@ int main(int argc, char *argv[])
                         break;
                 case 'U':
                     memset(missatge,0,strlen(missatge));
-                    printf("%d\n",valorTempAnt);
-                    sprintf(valorTempAntstr,"%d",valorTempAnt);
-                    printf("Valor de la temp: %s\n",valorTempAntstr);
-                    strcpy(missatge,"{U0");
-                    strcat(missatge,valorTempAntstr);
-                    strcat(missatge,"}\n");
-                    printf("%s\n",missatge);
-                    memset(buffer,0,strlen(buffer));
-                    strcpy(buffer,missatge);
-                    result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
-                    printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
+                    if (modifier == 100){
+                        modifier = 0;
+                    }
+                    if(modifier < numMostres) {
+                        printf("%d\n", temperatures[modifier]);
+                        sprintf(valorTempAntstr, "%d", temperatures[modifier]);
+                        printf("Valor de la temp: %s\n", valorTempAntstr);
+                        strcpy(missatge, "{U0");
+                        addDecimal(valorTempAntstr);
+                        strcat(missatge, valorTempAntstr);
+                        strcat(missatge, "}\n");
+                        printf("%s\n", missatge);
+                        memset(buffer, 0, strlen(buffer));
+                        strcpy(buffer, missatge);
+                        result = write(newFd, buffer, strlen(buffer) + 1); //+1 per enviar el 0 final de cadena'
+                        printf("Missatge enviat a client(bytes %d): %s\n", result, buffer);
+                        modifier++;
+                    }
+                    else if(modifier == numMostres){
+                        strcpy(missatge,"{U2}");
+                        memset(buffer,0,strlen(buffer));
+                        strcpy(buffer,missatge);
+                        result = write(newFd, buffer, strlen(buffer) + 1); //+1 per enviar el 0 final de cadena'
+                        printf("Missatge enviat a client(bytes %d): %s\n", result, buffer);
+                    }
+
                     result = close(newFd);
 
                     break;
                 case 'X':
                     memset(missatge,0,strlen(missatge));
-                    printf("%d\n",valorTempMax);
-                    sprintf(valorTempMaxstr,"%d",valorTempMax);
+                    printf("%d\n",tempMax);
+                    sprintf(valorTempMaxstr,"%d",tempMax);
                     printf("Valor de la temp: %s\n",valorTempMaxstr);
                     strcpy(missatge,"{X0");
+                    addDecimal(valorTempMaxstr);
+                   // clampTofive(valorTempAntstr);
                     strcat(missatge,valorTempMaxstr);
                     strcat(missatge,"}\n");
                     printf("%s\n",missatge);
@@ -203,10 +342,12 @@ int main(int argc, char *argv[])
                     break;
                 case 'Y':
                     memset(missatge,0,strlen(missatge));
-                    printf("%d\n",valorTempMin);
-                    sprintf(valorTempMinstr,"%d",valorTempMin);
+                    printf("%d\n",tempMin);
+                    sprintf(valorTempMinstr,"%d",tempMin);
                     printf("Valor de la temp: %s\n",valorTempMinstr);
                     strcpy(missatge,"{Y0");
+                    addDecimal(valorTempMinstr);
+                    //clampTofive(valorTempAntstr);
                     strcat(missatge,valorTempMinstr);
                     strcat(missatge,"}\n");
                     printf("%s\n",missatge);
@@ -221,12 +362,19 @@ int main(int argc, char *argv[])
                     strcpy(missatge,"{R0}\n");
                     memset(buffer,0,strlen(buffer));
                     strcpy(buffer,missatge);
+                    tempMax = max(temperatures,numMostres);
+                    tempMin = min(temperatures,numMostres);
                     result = write(newFd, buffer, strlen(buffer)+1); //+1 per enviar el 0 final de cadena'
                     printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
                     result = close(newFd);
                     break;
                 case 'B':
-                    sprintf(contadorDadesstr,"%d",contadorDades);
+                    if(numMostres < 100){
+                        sprintf(contadorDadesstr,"%d",(numMostres-modifier));
+                    }
+                    else if(numMostres-modifier >= 100){
+                        sprintf(contadorDadesstr,"%d",100);
+                    }
                     clampTofour(contadorDadesstr);
                     printf("valor: %s \n",contadorDadesstr);
                    // printf("String: %s\tNum %d\t longitud string %d\n",contadorDadesstr,contadorDades,strlen(contadorDadesstr));
@@ -238,6 +386,9 @@ int main(int argc, char *argv[])
                     missatge[6] = contadorDadesstr[3];
                     missatge[7] = '}';
                     missatge[8] = '\n';
+
+                   //strcat(missatge,contadorDadesstr);
+                   //strcat(missatge,"}\n");
                     printf("Missatge %s\n",missatge);
                     memset(buffer,0,strlen(buffer));
                     strcpy(buffer,missatge);
@@ -272,6 +423,7 @@ int main(int argc, char *argv[])
 
         /*Tancar el socket fill*/
         result = close(newFd);
+
     }
 }
 
