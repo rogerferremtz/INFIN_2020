@@ -43,8 +43,9 @@ void Param_Marxa(void)														//Funció per a demanar a l'usuari que entri
 
 void ImprimirMenu(void)														//Funció que imprimeix el menú de selecció
 {
-	printf("\n\nMenú de selecció:\n");
-	printf("--------------------\n");
+	printf("\n----------------------------------------------------------------\n");
+	printf("\nMenú de selecció:\n");
+	printf("____________________\n\n");
 	printf("1: Mostra més antiga (ºC)\n");
 	printf("2: Mostra màxima (ºC)\n");
 	printf("3: Mostra mínima (ºC)\n");
@@ -52,7 +53,7 @@ void ImprimirMenu(void)														//Funció que imprimeix el menú de selecci
 	printf("5: Mostres emmagatzemades\n");
 	printf("6: Posada en marxa\n");
 	printf("0: Sortir\n");
-	printf("--------------------\n");
+	printf("____________________\n\n");
 }
 
 
@@ -61,13 +62,13 @@ int main(int argc, char *argv[]){
 	char	    serverName[] = "127.0.0.1"; 								//Adreça IP on està el servidor
 	int			sockAddrSize;
 	int			sFd;
-	int 		indic = 0;
+	int 		indic = 0;													//Variable per a identificar si s'ha executat default en el switch case del menú de selecció
 	int 		result;
 	char		buffer[256];
 	char 		input;
 	
-	INICI:
-	indic = 0;
+	INICI:																	//Punt INICI, usat per a poder ser executar cíclicament
+	indic = 0;																//S'assegura que la variable s'inicii a 0 
 	
 	/*Crear el socket*/
 	sFd=socket(AF_INET,SOCK_STREAM,0);
@@ -86,83 +87,114 @@ int main(int argc, char *argv[]){
 		printf("Error en establir la connexió\n");
 		exit(-1);
 	}
-	printf("\nConnexió establerta amb el servidor: adreça %s, port %d\n",	inet_ntoa(serverAddr.sin_addr), ntohs(serverAddr.sin_port));
+	printf("\n\n\n\nConnexió establerta amb el servidor: adreça %s, port %d\n",	inet_ntoa(serverAddr.sin_addr), ntohs(serverAddr.sin_port));
 	
 	ImprimirMenu();
 	input = getchar();
 
-		switch (input)															//Switch case pel menu de selecció
+		switch (input)																		//Switch case pel menu de selecció
 		{
 			case '0':
-				strcpy (buffer,"{M0}");
+				strcpy (buffer,"{M0}");														//En cas de tancar el client, envia un missatge de parada al servidor abans d'aturar l'execució
 				result = write(sFd, buffer, strlen(buffer));
 				return 0;
 				 
 			case '1':
-				printf("\nHeu seleccionat l'opció 1: Mostra més antiga\n\n");
-				strcpy (buffer,"{U}");
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);                             
+				printf("\nHeu seleccionat l'opció 1: Mostra més antiga\n\n");				//Mostra a l'usuari l'opció que ha triat
+				strcpy (buffer,"{U}");														//Es posa en buffer el missatge que volem enviar, seguint el protocol de comunicació establert
+				result = write(sFd, buffer, strlen(buffer));								//S'envia el contingut del buffer
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);                             
 				break;
 				
 			case '2':
-				printf("\nHeu seleccionat l'opció 2: Mostra màxima\n\n");
-				strcpy (buffer,"{X}");
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);                            
+				printf("\nHeu seleccionat l'opció 2: Mostra màxima\n\n");					//Ídem cas '1'
+				strcpy (buffer,"{X}");														//		"
+				result = write(sFd, buffer, strlen(buffer));								//		"
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);                            
 				break;
 				
 			case '3':
-				printf("\nHeu seleccionat l'opció 3: Mostra mínima\n\n");
-				strcpy (buffer,"{Y}");
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);	                            
+				printf("\nHeu seleccionat l'opció 3: Mostra mínima\n\n");					//Ídem cas '1'
+				strcpy (buffer,"{Y}");														//		"
+				result = write(sFd, buffer, strlen(buffer));								//		"
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);	                            
 				break;
 				
 			case '4':
-				printf("\nHeu seleccionat l'opció 4: Reset mostres màxima i mínima\n\n");
-				strcpy (buffer,"{R}");
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);                          
+				printf("\nHeu seleccionat l'opció 4: Reset mostres màxima i mínima\n\n");	//Ídem cas '1'
+				strcpy (buffer,"{R}");														//		"
+				result = write(sFd, buffer, strlen(buffer));								//		"
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);                          
 				break;
 				
 			case '5':
-				printf("\nHeu seleccionat l'opció 5: Mostres emmagatzemades\n\n");	
-				strcpy (buffer,"{B}");
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);                         
+				printf("\nHeu seleccionat l'opció 5: Mostres emmagatzemades\n\n");			//Ídem cas '1'
+				strcpy (buffer,"{B}");														//		"
+				result = write(sFd, buffer, strlen(buffer));								//		"
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);                         
 				break;
 				
 			case '6':
-				printf("\nHeu seleccionat l'opció 6: Posada en marxa\n\n");
-				Param_Marxa();
-				strcpy (buffer,param);
-				result = write(sFd, buffer, strlen(buffer));
-				printf("Missatge enviat (bytes %d): %s\n", result, buffer);                           
+				printf("\nHeu seleccionat l'opció 6: Posada en marxa\n");					//Ídem cas '1'
+				Param_Marxa();																//Es crida la funció Param_marxa
+				strcpy (buffer,param);														//Es posa en buffer els paràmetres establerts a través de la funció anterior
+				result = write(sFd, buffer, strlen(buffer));								//S'envia el contingut del buffer
+				//printf("Missatge enviat (bytes %d): %s\n", result, buffer);                           
 				break;
 				                            
-			case 0x0a: 														//Envia els 0x0a (line feed) que s'envia quan li donem al Enter
+			case 0x0a: 																		//Envia els 0x0a (line feed) que s'envia quan li donem al Enter
 				break;
 				
 			default:
-				printf("Opció incorrecta\n");
-				strcpy (buffer,"ERROR");
-				indic = 1;
+				printf("\nOpció incorrecta\n");												//En cas d'entrar un nombre no considerat en el switch case, mostra missatge d'error per pantalla
+				indic = 1;																	//Indicdor per identificar si es vé de defalut. Si indic == 1, no haurà d'executar la funció result (es va provar a executar i el programa s'hi quedava encallat)
 				
 		}
 	
 		input = getchar();
 	
-	if (indic!=1)
+	if (indic!=1)																			
 	{
 		/*Rebre*/
 		result = read(sFd, buffer, 256);
-		printf("Missatge rebut del servidor(bytes %d): %s\n", result, buffer);
+		//printf("Missatge rebut del servidor(bytes %d): %s\n", result, buffer);
 
+		if (buffer[2]==0){																	//En cas que el codi retorn c sigui igual a 0 (cap error), procedeix a mostrar la informació pertinent de cada cas
+			switch (buffer[1])
+			{
+				case 'U':
+               		printf("La mostra més antiga és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7]);
+					break;
+               	
+				case 'X':
+			    	printf("La mostra màxima és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7]);
+			    	break;
+			    
+				case 'Y':
+			    	printf("La mostra mínima és: %c%c%c%c%c ℃\n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7]);
+		            break;
+		        
+				case 'B':
+		            printf("El nombre de mostres emmagatzemades és: %c%c%c%c%c \n",buffer[3],buffer[4],buffer[5],buffer[6],buffer[7]);
+		        	break;
+		        
+				default:
+					printf("Acció realitzada correctament");								//En cas que l'acció demanada per part del client sigui Reset max i min o bé marxa
+		        	break;																	// i el codi de retorn c sigui igual a 0 (cap error), mostra el missatge en pantalla
+				}
+			}	
+			else if(buffer[2]==1) 															//En cas que c==1, mostra per pantalla 'ERROR PROTOCOL'
+			{
+				printf("ERROR PROTOCOL");
+			}
+			else 																			//En cas que c==2, mostra per pantalla 'ERROR PARÀMETRES'
+			{
+				printf("ERROR PARÀMETRES");
+			}
 	}
 	
-		close(sFd);
-		goto INICI;
+		close(sFd);	
+		goto INICI;																			//Retorna al punt INICI
 
 	return 0;
 	}
