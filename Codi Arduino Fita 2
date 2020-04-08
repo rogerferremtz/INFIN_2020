@@ -1,0 +1,48 @@
+#define DEBUG(a, b) for (int index = 0; index < b; index++) Serial.print(a[index]); Serial.println(); //Instrucció per escriure al port serie la comanda del mestre
+
+void setup()
+{
+   Serial.begin(9600);
+   Serial.setTimeout(50);
+}
+
+
+void loop()
+{
+   if (Serial.available())  //Quan el port serial estigui disponible, quan hi arribi alguna dada
+   {
+      char comanda[20]; //Comanda és el missatge que ens envia el mestre
+      size_t count = Serial.readBytesUntil('\n', comanda, 20);  //Comptem els caracters que hi ha a la comanda fins arribar al caracter '\n', serveix per implementar el DEBUG
+      //DEBUG(comanda, count);
+
+      switch(comanda[1]){ //En funció de quin caracter tenim a la posició 1 del buffer, executem una instrucció o una altra
+        case 'M':
+          operaciom(comanda);
+        break;
+        case 'S':
+        break;
+        case 'E':
+        break;
+        case 'C':
+        break;
+      }
+   }
+}
+
+void operaciom(char comandam[20]){  //Funció un cop s'ens ha demanat la instrucció de MARXA/PARA.
+    char respostaerror1m[4]={'A','M','1','Z'}; //Definim el array que s'envia al mestre en cas d'error 1.
+    char respostaerror2m[4]={'A','M','2','Z'};  //Definim el array que s'envia al mestre en cas d'error 2.
+    int error;
+    
+    for (int index = 0; index < 20; index++){ //Avaluem cada caracter del buffer, en cas d'haver-hi una altra 'A' que el seu codi ASCII és 65,
+      if( index==65){                        // que no estigui en la posició 1, incrementem la variable error que farà enviar una resposta d'error.
+        error = error + 1;
+      }
+      if(operaciom[5]!='Z' || error > 0){ //Si no hi ha una 'Z' a la posició 5, o hi ha més d'una 'A', enviem error 1.
+        DEBUG(respostaerror1m,4);
+      }else{  //Si no hi ha error 1, responem normal de moment.
+        char respostam[4]={'A','M','0','Z'};
+        DEBUG(respostam,4);
+      }
+    }
+}
