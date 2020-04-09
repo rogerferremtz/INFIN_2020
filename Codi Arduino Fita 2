@@ -1,9 +1,28 @@
 #define DEBUG(a, b) for (int index = 0; index < b; index++) Serial.print(a[index]); Serial.println(); //Instrucció per escriure al port serie la comanda del mestre
 
+#include <avr/sleep.h>
+
 void setup()
 {
    Serial.begin(9600);
    Serial.setTimeout(50);
+   //analogReference( INTERNAL );
+   // REFS1 REFS0          --> 0 0 AREF, Internal Vref turned off
+   // MUX3 MUX2 MUX1 MUX0  --> 1110 1.1V (VBG)
+   ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (1<<MUX3) | (1<<MUX2) | (1<<MUX1) | (0<<MUX0);    //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
+                                                                                                    //Fixem l'ADLAR=0, per tenir ADC[7..0] al ADCL i els ADC[9..8] al ADCH.
+                                                                                                    //Fixem els bits de MUX a [1110], per comprovar que la conversió s'està fent de forma correcta.
+                                                                                                    //Un cop connectat el sensor, cladria fixar els bits de MUX a [1000] ja que és l'entrada pel sensor de temperatura.
+   ADCSRA |= 1 << ADEN;                             //Posem l'ADC en marxa
+   ADCSRA |= 1 << ADATE;                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
+                                                    //L'interrupció ADIF es posa a 1 quan ha acabat conversió.
+   ADCSRA |= 1 << ADIE;                             //Si es defineix el bit ADIE a 1 significa que quan l’ADC fa una mesura, es produeix una interrupció, la interrupció despertarà el xip del mode SLEEP.
+   ADCSRA |= ((1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0));    //Fixem el Prescaler a 128 de manera que tenim un clock de 125Khz per fer les mesures.
+                                                    //El rellotge ADC ha d’estar entre 50kHz i 200kHz, ja que el rellotge Uno és de 16MHz volem dividir-lo per 128 per obtenir 125kHz.
+                                                    // No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
+  sleep_enable();                                   //Habilitem al funció d'SLEEP.
+  set_sleep_mode(SLEEP_MODE_ADC);                   //Fixem el mode d'SLEEP. Estem utilitzant el "ADC noise reduction sleep mode".
+                                                    //Tingueu en compte que en aquest mode SLEEP el xip inicia automàticament una mesura ADC un cop el xip entra en mode SLEEP.
 }
 
 
