@@ -17,7 +17,7 @@ void loop()
 
   switch(comanda[1]){                                                 //En funció de quin caracter tenim a la posició 1 del buffer, executem una instrucció o una altra
         case 'M':
-          operaciom(comanda, count);
+          operaciom(comanda, count);                                  //A la funció de Operació MARXA, li enviem el buffer sencer i la seva longitut.
         break;
         case 'S':
         break;
@@ -33,16 +33,23 @@ void operaciom(char comandam[20], int caracters){     //Funció un cop s'ens ha 
     char respostaerror1m[4]={'A','M','1','Z'};        //Definim el array que s'envia al mestre en cas d'error 1.
     char respostaerror2m[4]={'A','M','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
     int error = 0;
+    int mostreig = 0;
+    int t1 = comandam[3] - '0';                       //Convertim el byte alt del nombre de segons de mostreig a integer.
+    int t2 = comandam[4] - '0';                       //Convertim el byte baix del nombre de segons de mostreig a integer.
+    mostreig = t1*10 + t2;                            //Formem un sol nombre que és el temps de mostreig.
     
     for (int index = 2; index < caracters; index++){  //Avaluem cada caracter del buffer, en cas d'haver-hi una altra 'A' que el seu codi ASCII és 65,
       if( comandam[index] == 'A' ){                   // que no estigui en la posició 1, incrementem la variable error que farà enviar una resposta d'error.
         error = error + 1;
       }
     }
-      if(comandam[5] != 'Z' || error > 0){           //Si no hi ha una 'Z' a la posició 5, o hi ha més d'una 'A', enviem error 1.
-        DEBUG(respostaerror1m,4);
-      }else{                                          //Si no hi ha error 1, responem normal de moment.
-        char respostam[4]={'A','M','0','Z'};
+
+    if(comandam[5] != 'Z' || error > 0){              //Si no hi ha una 'Z' a la posició 5, o hi ha més d'una 'A', enviem error 1.
+      DEBUG(respostaerror1m,4);
+    }else if(mostreig > 20 || mostreig < 1){          //Comprobem que el temps de mostratge rebut estigui entre 1 i 20,
+      DEBUG(respostaerror2m,4);                       //sinò, enviem el missatge d'error 2.
+      }else{                                          
+        char respostam[4]={'A','M','0','Z'};          //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
         DEBUG(respostam,4);
       }
 }
