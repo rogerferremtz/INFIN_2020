@@ -2,36 +2,39 @@
 
 #include <avr/sleep.h>
 
+int valor_ADC;
+
 void setup()
 {
    Serial.begin(9600);
    Serial.setTimeout(50);
-   //analogReference( INTERNAL );
-   // REFS1 REFS0          --> 0 0 AREF, Internal Vref turned off
-   // MUX3 MUX2 MUX1 MUX0  --> 1110 1.1V (VBG)
+   analogReference( INTERNAL );
+
 
 //_________________________________________________________________CONFIGURACIÓ ADC_______________________________________________________________________________________________________________________________
-   ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (1<<MUX3) | (1<<MUX2) | (1<<MUX1) | (0<<MUX0);    //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
-                                                                                                    //Fixem l'ADLAR=0, per tenir ADC[7..0] al ADCL i els ADC[9..8] al ADCH.
-                                                                                                    //Fixem els bits de MUX a [1110], per comprovar que la conversió s'està fent de forma correcta.
-                                                                                                    //Un cop connectat el sensor, cladria fixar els bits de MUX a [1000] ja que és l'entrada pel sensor de temperatura.
-   ADCSRA |= 1 << ADEN;                             //Posem l'ADC en marxa.
-   ADCSRA |= 1 << ADATE;                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
-                                                    //L'interrupció ADIF es posa a 1 quan ha acabat conversió.
-   ADCSRA |= 1 << ADIE;                             //Si es defineix el bit ADIE a 1 significa que quan l’ADC fa una mesura, es produeix una interrupció, la interrupció despertarà el xip del mode SLEEP.
-   ADCSRA |= ((1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0));    //Fixem el Prescaler a 128 de manera que tenim un clock de 125Khz per fer les mesures.
-                                                    //El rellotge ADC ha d’estar entre 50kHz i 200kHz, ja que el rellotge Uno és de 16MHz volem dividir-lo per 128 per obtenir 125kHz.
-   ADCSRA |= ((1<<ADTS2)|(0<<ADTS1)|(1<<ADTS0));    //Cada cop que el TIMER/COUNTER1 faci una interrupció, despertem al xip automaticament.
-                                                    // No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
-   sleep_enable();                                  //Habilitem al funció d'SLEEP.
-   set_sleep_mode(SLEEP_MODE_ADC);                  //Fixem el mode d'SLEEP. Estem utilitzant el "ADC noise reduction sleep mode".
-                                                    //En aquest mode SLEEP el xip inicia automàticament una mesura ADC un cop el xip entra en mode SLEEP.
+   
+   ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (0<<MUX3) | (1<<MUX2) | (0<<MUX1) | (1<<MUX0);      //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
+                                                                                                      //Fixem l'ADLAR=0, per tenir ADC[7..0] al ADCL i els ADC[9..8] al ADCH.
+                                                                                                      //Fixem els bits de MUX a [0000] => A0, per comprovar que la conversió s'està fent de forma correcta.
+   //ADMUX = 0x45;                                     //PIN 5 analog.
+   ADCSRA = ((1 << ADEN)|                            //Posem l'ADC en marxa.
+            (0 << ADSC)|                             //Bit START CONVERSION a 0, ja que volem l'AUTO TRIGGER.
+            (1 << ADATE)|                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
+            (0 << ADIF)|                             //Aquest bit es posa a 1 quan s'acaba una conversió ADC i s'actualitzen els registres de dades. 
+            (1 << ADIE)|                             //Si es defineix el bit ADIE a 1 significa que quan l’ADC fa una mesura, es produeix una interrupció, la interrupció despertarà el xip del mode SLEEP.
+            (1<<ADPS2)|
+            (1<<ADPS1)|
+            (1<<ADPS0));                             //Fixem el Prescaler a 128 de manera que tenim un clock de 125Khz per fer les mesures.
+                                                     //El rellotge ADC ha d’estar entre 50kHz i 200kHz, ja que el rellotge Uno és de 16MHz volem dividir-lo per 128 per obtenir 125kHz.
+
+                                                     //L'interrupció ADIF es posa a 1 quan ha acabat conversió.
+    ADCSRB = ((0<<ADTS2)|(1<<ADTS1)|(1<<ADTS0));     //Cada cop que el TIMER/COUNTER1 es compari amb el valor del registre A, fa una interrupció, despertem al xip automaticament.
+                                                     // No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
+   //sleep_enable();                                 //Habilitem al funció d'SLEEP.
+   //set_sleep_mode(SLEEP_MODE_ADC);                 //Fixem el mode d'SLEEP. Estem utilitzant el "ADC noise reduction sleep mode".
+                                                     //En aquest mode SLEEP el xip inicia automàticament una mesura ADC un cop el xip entra en mode SLEEP.
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
 }
-
-
-
-
 void loop()
 {
    if (Serial.available())                                            //Quan el port serial estigui disponible, quan hi arribi alguna dada
@@ -79,8 +82,7 @@ void operaciom(char comandam[20], int caracters){     //Funció un cop s'ens ha 
         if(comandam[2]=='1'){
           tempsdemostratge(mostreig);                 //Si rebem indicació de MARXA, cridem a la funció que configura el timer que genera les interrupcions.
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
-          Serial.print(ADCL);
-          Serial.println(ADCH);
+          Serial.println(valor_ADC);
         }
       }
 }
@@ -94,12 +96,16 @@ void tempsdemostratge(int temps){
   TCCR1B |= (1 << CS12) | (1 << CS10);                      //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
   TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
   OCR1A = (16000000/(1024*(1/temps)))-1;                    // Quan el valor del comptador (TCNT1) és igual a OCR1A, s'activa interrupció.
-  TIMSK1 |= (1 << OCIE1A);                                  // Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar el nostre temporitzador que usarem el registre OCRnA per al comparador. 
+  TIMSK1 |= (1 << OCIE1A);                                  // Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
   interrupts();                                             // Activem les interrupcions novament.
+  
   //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
 }
 
 ISR(TIMER1_COMPA_vect){
-  Serial.print(ADCL);
-  Serial.println(ADCH);
+  //Serial.print(ADCL);
+  //Serial.println(ADCH);
+  word wADC = ADCW;
+  valor_ADC = wADC;
+  Serial.println(valor_ADC);
 }
