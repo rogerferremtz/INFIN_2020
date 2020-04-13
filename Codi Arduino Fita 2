@@ -3,10 +3,10 @@
 
 #include <avr/sleep.h>
 
-int valor_ADC;
-int* punter_valor_ADC = &valor_ADC;
-bool PARADA;
-bool* punter_PARADA = &PARADA;
+int valor_ADC;                          //Variable on s'emmagatzema l'últim valor de l'ADC.
+int* punter_valor_ADC = &valor_ADC;     //Punter a l'últim valor de l'ADC.
+bool PARADA;                            //Variable booleana que indica si la conversió està en marxa o no (utilitzat a Operació 'C').
+bool* punter_PARADA = &PARADA;          //Utilitzem un punter per poser canviar el valor de dita variable.
 
 void setup()
 {
@@ -23,7 +23,7 @@ void setup()
    
    ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (0<<MUX3) | (1<<MUX2) | (0<<MUX1) | (1<<MUX0);      //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
                                                                                                       //Fixem l'ADLAR=0, per tenir ADC[7..0] al ADCL i els ADC[9..8] al ADCH.
-                                                                                                      //Fixem els bits de MUX a [0101] => A0.
+                                                                                                      //Fixem els bits de MUX a [0101] => A5.
    ADCSRA = ((1 << ADEN)|                            //Posem l'ADC en marxa.
             (0 << ADSC)|                             //Bit START CONVERSION a 0, ja que volem l'AUTO TRIGGER.
             (1 << ADATE)|                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
@@ -32,9 +32,9 @@ void setup()
             (1<<ADPS2)|                              
             (1<<ADPS1)|
             (1<<ADPS0));                             //Fixem el Prescaler a 128 de manera que tenim un clock de 125Khz per fer les mesures.
-                                                     //El rellotge ADC ha d’estar entre 50kHz i 200kHz, ja que el rellotge Uno és de 16MHz volem dividir-lo per 128 per obtenir 125kHz.
-
+                                                     //El rellotge ADC ha d’estar entre 50kHz i 200kHz, ja que el rellotge de l'Arduino Uno és de 16MHz volem dividir-lo per 128 per obtenir 125kHz.
                                                      //L'interrupció ADIF es posa a 1 quan ha acabat conversió.
+
     ADCSRB = ((1<<ADTS2)|(0<<ADTS1)|(1<<ADTS0));     //Cada cop que el TIMER/COUNTER1 es compari amb el valor del registre B, fa una interrupció, despertem al xip automaticament.
                                                      //No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
     sleep_enable();                                  //Habilitem al funció d'SLEEP.
@@ -50,33 +50,33 @@ void setup()
 
 void loop()
 {
-   if (Serial.available())                                            //Quan el port serial estigui disponible, quan hi arribi alguna dada
+   if (Serial.available())                                            //Quan el port serial estigui disponible, quan hi arribi alguna dada.
    {
-      char comanda[20];                                               //Comanda és el missatge que ens envia el mestre
-      size_t count = Serial.readBytesUntil('\n', comanda, 20);        //Comptem els caracters que hi ha a la comanda fins arribar al caracter '\n', serveix per implementar el DEBUG
-      //DEBUG(comanda, count);
+      char comanda[20];                                               //Comanda és el missatge que ens envia el mestre.
+      size_t count = Serial.readBytesUntil('\n', comanda, 20);        //Comptem els caracters que hi ha a la comanda fins arribar al caracter '\n', serveix per implementar el DEBUG.
 
-  switch(comanda[1]){                                                 //En funció de quin caracter tenim a la posició 1 del buffer, executem una instrucció o una altra
+  switch(comanda[1]){                                                 //En funció de quin caracter tenim a la posició 1 del buffer, executem una instrucció o una altra.
         case 'M':
           operaciom(comanda, count);                                  //A la funció de Operació MARXA, li enviem el buffer sencer i la seva longitut.
         break;
         case 'S':
-          operacios(comanda, count);
+          operacios(comanda, count);                                  //A la funció de Operació SORTIDA, li enviem el buffer sencer i la seva longitut.
         break;
         case 'E':
-          operacioe(comanda, count);
+          operacioe(comanda, count);                                  //A la funció de Operació ENTRADA, li enviem el buffer sencer i la seva longitut.
         break;
         case 'C':
-          operacioc(comanda, count);
+          operacioc(comanda, count);                                  //A la funció de Operació CONVERTIDOR, li enviem el buffer sencer i la seva longitut.
         break;
       }
    }
 }
 
 
-int operaciom(char comandam[20], int caracters){     //Funció un cop s'ens ha demanat la instrucció de MARXA/PARA.
+int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha demanat la instrucció de MARXA/PARA.
     char respostaerror1m[4]={'A','M','1','Z'};        //Definim el array que s'envia al mestre en cas d'error 1.
     char respostaerror2m[4]={'A','M','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
+    char respostam[4]={'A','M','0','Z'};              //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
     int error = 0;
     int mostreig = 0;
     int t1 = comandam[3] - '0';                       //Convertim el byte alt del nombre de segons de mostreig a integer.
@@ -94,15 +94,14 @@ int operaciom(char comandam[20], int caracters){     //Funció un cop s'ens ha d
     }else if(mostreig > 20 || mostreig < 1){          //Comprobem que el temps de mostratge rebut estigui entre 1 i 20,
       DEBUG(respostaerror2m,4);                       //sinò, enviem el missatge d'error 2.
       }else{                                          
-        char respostam[4]={'A','M','0','Z'};          //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
-        DEBUG(respostam,4);
+        DEBUG(respostam,4);                           //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
         if(comandam[2]=='1'){
-          *punter_PARADA = LOW;
+          *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW.
           tempsdemostratge(mostreig);                 //Si rebem indicació de MARXA, cridem a la funció que configura el timer que genera les interrupcions.
           //unsigned int valor_comptador = (16000000/2*1024*(1/mostreig))-1;
           //Serial.println(valor_comptador);
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
-          *punter_PARADA = HIGH;
+          *punter_PARADA = HIGH;                      //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
           Serial.println(valor_ADC);
         }
       }
@@ -134,10 +133,10 @@ void operacios(char comandas[20], int caracters){
       DEBUG(respostaerror2s,4);                       //sinò, enviem el missatge d'error 2.
       }else if(comandas[4]=='1'){                     //Avaluem en cas que el valor de la sortida rebut sigui 1.
           DEBUG(respostas,4);
-          digitalWrite(sortida,HIGH); 
+          digitalWrite(sortida,HIGH);                 //Posem a HIGH la sortida que s'ens ha demanat.
         }else if(comandas[4]=='0'){                   //Avaluem en cas que el valor de la sortida rebut sigui 0.
           DEBUG(respostas,4);
-          digitalWrite(sortida,LOW);
+          digitalWrite(sortida,LOW);                  //Posem a LOW la sortida que s'ens ha demanat.
         }
 }
 
