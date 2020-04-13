@@ -220,10 +220,10 @@ void tempsdemostratge(int temps){
 }
 
 ISR(TIMER1_COMPA_vect){
-  //if(ADIF == 1){                             //Quan el bit que ens indica que la conversió de l'ADC ha estat complerta, 
+  if(ADIF == 1){                             //Quan el bit que ens indica que la conversió de l'ADC ha estat complerta, 
     word wADC = ADCW;                          //treiem pel port sèrie els valor de la conversió, i tornem a posar el bit a 0.
     *punter_valor_ADC = wADC;
     Serial.println(valor_ADC);
-    //ADCSRA = (0 << ADIF);
-  //}
+    ADCSRA = (0 << ADIF);
+  }
 }
