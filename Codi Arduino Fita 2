@@ -7,6 +7,10 @@ int valor_ADC;                          //Variable on s'emmagatzema l'últim val
 int* punter_valor_ADC = &valor_ADC;     //Punter a l'últim valor de l'ADC.
 bool PARADA;                            //Variable booleana que indica si la conversió està en marxa o no (utilitzat a Operació 'C').
 bool* punter_PARADA = &PARADA;          //Utilitzem un punter per poser canviar el valor de dita variable.
+int comptador = 0;
+int* punter_comptador = &comptador;
+int mostreig = 0;
+int* punter_mostreig = & mostreig;
 
 void setup()
 {
@@ -37,10 +41,26 @@ void setup()
 
     ADCSRB = ((1<<ADTS2)|(0<<ADTS1)|(1<<ADTS0));     //Cada cop que el TIMER/COUNTER1 es compari amb el valor del registre B, fa una interrupció, despertem al xip automaticament.
                                                      //No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
-    sleep_enable();                                  //Habilitem al funció d'SLEEP.
-    set_sleep_mode(SLEEP_MODE_ADC);                  //Fixem el mode d'SLEEP. Estem utilitzant el "ADC noise reduction sleep mode".
-                                                     //En aquest mode SLEEP el xip inicia automàticament una mesura ADC un cop el xip entra en mode SLEEP.
+
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+  //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
+  noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
+  TCCR1A = 0;                                               //El registre de control A queda tot a 0.
+  TCCR1B = 0;                                               //El registre de control B queda tot a 0.
+  TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
+  
+  OCR1B = 31250;//15625;                                            //Quan el valor del comptador (TCNT1) és igual a OCR1B, s'activa interrupció. Generem una interrupsció cada segon.
+  TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
+  TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
+  TIMSK1 |= (1 << OCIE1B);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
+  interrupts();                                             //Activem les interrupcions novament.
+
+  //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
+
+
+
+
 }
 
 
@@ -54,7 +74,7 @@ void loop()
    {
       char comanda[20];                                               //Comanda és el missatge que ens envia el mestre.
       size_t count = Serial.readBytesUntil('\n', comanda, 20);        //Comptem els caracters que hi ha a la comanda fins arribar al caracter '\n', serveix per implementar el DEBUG.
-
+    
   switch(comanda[1]){                                                 //En funció de quin caracter tenim a la posició 1 del buffer, executem una instrucció o una altra.
         case 'M':
           operaciom(comanda, count);                                  //A la funció de Operació MARXA, li enviem el buffer sencer i la seva longitut.
@@ -78,10 +98,9 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
     char respostaerror2m[4]={'A','M','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
     char respostam[4]={'A','M','0','Z'};              //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
     int error = 0;
-    int mostreig = 0;
     int t1 = comandam[3] - '0';                       //Convertim el byte alt del nombre de segons de mostreig a integer.
     int t2 = comandam[4] - '0';                       //Convertim el byte baix del nombre de segons de mostreig a integer.
-    mostreig = t1*10 + t2;                            //Formem un sol nombre que és el temps de mostreig.
+    *punter_mostreig = t1*10 + t2;                    //Formem un sol nombre que és el temps de mostreig.
     
     for (int index = 1; index < caracters; index++){  //Avaluem cada caracter del buffer des de la posició 1, en cas d'haver-hi una altra 'A',
       if( comandam[index] == 'A' ){                   //que no estigui en la posició 1, incrementem la variable error que farà enviar una resposta d'error.
@@ -96,10 +115,7 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
       }else{                                          
         DEBUG(respostam,4);                           //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
         if(comandam[2]=='1'){
-          tempsdemostratge(mostreig);                 //Si rebem indicació de MARXA, cridem a la funció que configura el timer que genera les interrupcions.
           *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW.
-          //unsigned int valor_comptador = (16000000/2*1024*(1/mostreig))-1;
-          //Serial.println(valor_comptador);
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
           *punter_PARADA = HIGH;                      //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
           Serial.println(valor_ADC);
@@ -165,9 +181,9 @@ void operacioe(char comandae[20], int caracters){
       DEBUG(respostaerror1e,5);
     }else if(entrada > 13 || entrada < 0){              //Comprobem que la entrada estigui entre 0 i 13, que són els pins d'Arduino, sinò, enviem el missatge d'error 2.
       DEBUG(respostaerror2e,4);
-      }else if(digitalRead(entrada)== HIGH){           //Avaluem en cas que el valor llegit de l'entrada sigui 1.
+      }else if(digitalRead(entrada)== HIGH){            //Avaluem en cas que el valor llegit de l'entrada sigui 1.
               DEBUG(respostae1,5);
-            }else if(digitalRead(entrada)== LOW){      //Avaluem en cas que el valor llegit de l'entrada sigui 0.
+            }else if(digitalRead(entrada)== LOW){       //Avaluem en cas que el valor llegit de l'entrada sigui 0.
               DEBUG(respostae0,5);
             }
 }
@@ -203,27 +219,21 @@ void operacioc(char comandac[20], int caracters){
 }
 
 
-void tempsdemostratge(int temps){
-  //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
-  noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
-  TCCR1A = 0;                                               //El registre de control A queda tot a 0.
-  TCCR1B = 0;                                               //El registre de control B queda tot a 0.
-  TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
-  
-  OCR1B = (16000000/1024/(1/temps));                    //Quan el valor del comptador (TCNT1) és igual a OCR1B, s'activa interrupció.
-  TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
-  TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
-  TIMSK1 |= (1 << OCIE1B);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
-  interrupts();                                             //Activem les interrupcions novament.
 
-  //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
-}
 
-ISR(TIMER1_COMPA_vect){
-  if(ADIF == 1){                             //Quan el bit que ens indica que la conversió de l'ADC ha estat complerta, 
+
+ISR(TIMER1_COMPB_vect){
+    Serial.println("Hola");
+    if(comptador < mostreig){
+      //Serial.println(mostreig);  
+      //Serial.println(comptador);
+      
+      comptador ++;
+  }
+  if(ADIF == 1 && comptador == mostreig){      //Quan el bit que ens indica que la conversió de l'ADC ha estat complerta, 
     word wADC = ADCW;                          //treiem pel port sèrie els valor de la conversió, i tornem a posar el bit a 0.
     *punter_valor_ADC = wADC;
     Serial.println(valor_ADC);
-    ADCSRA = (0 << ADIF);
+    comptador=0;
   }
 }
