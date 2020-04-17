@@ -25,12 +25,12 @@ void setup()
 
 //_________________________________________________________________CONFIGURACIÓ ADC_______________________________________________________________________________________________________________________________
    
-   ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (0<<MUX3) | (1<<MUX2) | (0<<MUX1) | (1<<MUX0);      //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
+   /*ADMUX = (1<<REFS1) | (1<<REFS0) | (0<<ADLAR) | (0<<MUX3) | (1<<MUX2) | (0<<MUX1) | (1<<MUX0);      //Posem els bits REFS a [1 1] per així tenir la referència interna de 1.1V, amb la qual obtindrem més resolució (1.1/1024).
                                                                                                       //Fixem l'ADLAR=0, per tenir ADC[7..0] al ADCL i els ADC[9..8] al ADCH.
                                                                                                       //Fixem els bits de MUX a [0101] => A5.
    ADCSRA = ((1 << ADEN)|                            //Posem l'ADC en marxa.
             (0 << ADSC)|                             //Bit START CONVERSION a 0, ja que volem l'AUTO TRIGGER.
-            (1 << ADATE)|                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
+             (1 << ADATE)|                            //Habilitem l'AUTO TRIGGERING. L'ADC començarà la conversió quan hi hagi un flanc de pujada a un altre senyal de trigger que es fixarà al ADTS.
             (0 << ADIF)|                             //Aquest bit es posa a 1 quan s'acaba una conversió ADC i s'actualitzen els registres de dades. 
             (1 << ADIE)|                             //Si es defineix el bit ADIE a 1 significa que quan l’ADC fa una mesura, es produeix una interrupció, la interrupció despertarà el xip del mode SLEEP.
             (1<<ADPS2)|                              
@@ -43,7 +43,7 @@ void setup()
                                                      //No hem d’utilitzar registres per configurar el mode SLEEP ja que utilitzem la biblioteca avr / sleep.h
 
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
-
+*/
 
 
 
@@ -77,6 +77,19 @@ void loop()
         break;
       }
    }
+   //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
+ noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
+ TCCR1A = 0;                                               //El registre de control A queda tot a 0.
+ TCCR1B = 0;                                               //El registre de control B queda tot a 0.
+ TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
+ 
+ OCR1B = 15625;                                            //Quan el valor del comptador (TCNT1) és igual a OCR1B, s'activa interrupció. Generem una interrupsció cada segon.
+ TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
+ TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
+ TIMSK1 |= (1 << OCIE1B);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
+ interrupts();                                             //Activem les interrupcions novament.
+ //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
+
 }
 
 
@@ -103,7 +116,7 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
         DEBUG(respostam,4);                           //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
         if(comandam[2]=='1'){
           *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW.
-          timer();
+          *punter_comptador = 0;
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
           *punter_PARADA = HIGH;                      //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
           Serial.println(valor_ADC);
@@ -206,29 +219,15 @@ void operacioc(char comandac[20], int caracters){
       }
 }
 
-void timer(){
- //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
- noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
- TCCR1A = 0;                                               //El registre de control A queda tot a 0.
- TCCR1B = 0;                                               //El registre de control B queda tot a 0.
- TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
- 
- OCR1B = 15625;                                            //Quan el valor del comptador (TCNT1) és igual a OCR1B, s'activa interrupció. Generem una interrupsció cada segon.
- TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
- TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
- TIMSK1 |= (1 << OCIE1B);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
- interrupts();                                             //Activem les interrupcions novament.
- //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
-}
+
 
 
 
 ISR(TIMER1_COMPB_vect){
-    comptador ++;
-    if(ADIF == 1 && comptador == mostreig){      //Quan el bit que ens indica que la conversió de l'ADC ha estat complerta, 
-      word wADC = ADCW;                          //treiem pel port sèrie els valor de la conversió, i tornem a posar el bit a 0.
-      *punter_valor_ADC = wADC;
+    *punter_comptador ++;
+    if(comptador == mostreig){      
+      *punter_valor_ADC = analogRead(5);                   //Treiem pel port sèrie els valor de la conversió, i tornem a posar el bit a 0.
       Serial.println(valor_ADC);
-      comptador=0;
+      *punter_comptador=0;
     }
 }
