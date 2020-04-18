@@ -1,16 +1,16 @@
 #define DEBUG(a, b) for (int index = 0; index < b; index++) Serial.print(a[index]); Serial.println();     //Instrucció per escriure al port serie la resposta de l'esclau al mestre.
-#define BAUD 9600
+#define BAUD 9600                       //Definim la velocitat de comunicació sèrie.
 
 #include <avr/sleep.h>
 
 int valor_ADC;                          //Variable on s'emmagatzema l'últim valor de l'ADC.
 int* punter_valor_ADC = &valor_ADC;     //Punter a l'últim valor de l'ADC.
-bool PARADA;                            //Variable booleana que indica si la conversió està en marxa o no (utilitzat a Operació 'C').
+bool PARADA;                            //Variable booleana que indica si la conversió està en marxa o no (utilitzat a Operació 'C' i al Timer).
 bool* punter_PARADA = &PARADA;          //Utilitzem un punter per poser canviar el valor de dita variable.
-int comptador = 0;
-int* punter_comptador = &comptador;
-int mostreig = 0;
-int* punter_mostreig = & mostreig;
+int comptador = 0;                      //Variable que compta els segons que van passant (veure Timer).
+int* punter_comptador = &comptador;     //Punter a la variable "comptador", per poder modificar el seu valor.
+int mostreig = 200;                     //Valor de temps de mostreig, quan la variable de comptador sigui igual a la de mostreig, es genera una interrupció al Timer i s'inicia la conversió.
+int* punter_mostreig = & mostreig;      //Punter a la variable de "mostreig".
 
 void setup()
 {
@@ -20,8 +20,7 @@ void setup()
    Serial.setTimeout(50);                             //Fixem el temps màxim que està llegint el port sèrie, 50ms.
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
   
-   analogReference( INTERNAL );                       //Voltatge de referència per la conversió analògica - digital, 1.1V.
-   pinMode(A5,INPUT);                                 //Pin A5 (sensor), és INPUT.
+   pinMode(5,INPUT);                                  //Pin A5 (sensor), és INPUT.
 
 //_________________________________________________________________CONFIGURACIÓ ADC_______________________________________________________________________________________________________________________________
    
@@ -44,7 +43,6 @@ void setup()
 
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
 */
-
 
 
 
@@ -77,18 +75,6 @@ void loop()
         break;
       }
    }
-   //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
- noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
- TCCR1A = 0;                                               //El registre de control A queda tot a 0.
- TCCR1B = 0;                                               //El registre de control B queda tot a 0.
- TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
- 
- OCR1B = 15625;                                            //Quan el valor del comptador (TCNT1) és igual a OCR1B, s'activa interrupció. Generem una interrupsció cada segon.
- TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
- TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge))-1.
- TIMSK1 |= (1 << OCIE1B);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
- interrupts();                                             //Activem les interrupcions novament.
- //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
 
 }
 
@@ -97,7 +83,7 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
     char respostaerror1m[4]={'A','M','1','Z'};        //Definim el array que s'envia al mestre en cas d'error 1.
     char respostaerror2m[4]={'A','M','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
     char respostam[4]={'A','M','0','Z'};              //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
-    int error = 0;
+    int error = 0;                                    //Variable que s'incrementa cada cop que trobem una segona 'A' abans de la 'Z'.
     int t1 = comandam[3] - '0';                       //Convertim el byte alt del nombre de segons de mostreig a integer.
     int t2 = comandam[4] - '0';                       //Convertim el byte baix del nombre de segons de mostreig a integer.
     *punter_mostreig = t1*10 + t2;                    //Formem un sol nombre que és el temps de mostreig.
@@ -115,8 +101,9 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
       }else{                                          
         DEBUG(respostam,4);                           //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
         if(comandam[2]=='1'){
-          *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW.
+          *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW, i inicialitzem la variable "comptador" a 0.
           *punter_comptador = 0;
+          temporitzador();                            //Cridem a la funció que configura el Timer.
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
           *punter_PARADA = HIGH;                      //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
           Serial.println(valor_ADC);
@@ -130,8 +117,8 @@ void operacios(char comandas[20], int caracters){
     char respostaerror2s[4]={'A','S','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
     char respostas[4]={'A','S','0','Z'};              //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK'.
    
-    int error = 0;
-    int sortida = 0;
+    int error = 0;                                    //Variable que s'incrementa cada cop que trobem una segona 'A' abans de la 'Z'.
+    int sortida = 0;                                  //Variable en la qual es guardarà el valor del pin de la sortida.
     
     int n1 = comandas[2] - '0';                       //Convertim el byte alt del nombre de sortida a integer.
     int n2 = comandas[3] - '0';                       //Convertim el byte baix del nombre de sortida a integer.
@@ -159,13 +146,13 @@ void operacios(char comandas[20], int caracters){
 
 
 void operacioe(char comandae[20], int caracters){
-    char respostaerror1e[5]={'A','E','1','Z'};         //Definim el array que s'envia al mestre en cas d'error 1.
-    char respostaerror2e[5]={'A','E','2','Z'};         //Definim el array que s'envia al mestre en cas d'error 2.
-    char respostae1[5]={'A','E','0','1','Z'};          //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK', s'hi afegeix el valor de l'entrada.
-    char respostae0[5]={'A','E','0','0','Z'};          //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK', s'hi afegeix el valor de l'entrada.
+    char respostaerror1e[5]={'A','E','1','Z'};        //Definim el array que s'envia al mestre en cas d'error 1.
+    char respostaerror2e[5]={'A','E','2','Z'};        //Definim el array que s'envia al mestre en cas d'error 2.
+    char respostae1[5]={'A','E','0','1','Z'};         //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK', s'hi afegeix el valor de l'entrada.
+    char respostae0[5]={'A','E','0','0','Z'};         //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK', s'hi afegeix el valor de l'entrada.
    
-    int error = 0;
-    int entrada = 0;
+    int error = 0;                                    //Variable que s'incrementa cada cop que trobem una segona 'A' abans de la 'Z'.
+    int entrada = 0;                                  //Variable en la qual es guardarà el valor del pin de la entrada.
     
     int n1 = comandae[2] - '0';                       //Convertim el byte alt del nombre de l'entrada a integer.
     int n2 = comandae[3] - '0';                       //Convertim el byte baix del nombre de l'entrada a integer.
@@ -193,41 +180,54 @@ void operacioe(char comandae[20], int caracters){
 void operacioc(char comandac[20], int caracters){
     char respostaerror1c[4]={'A','C','1','Z'};         //Definim el array que s'envia al mestre en cas d'error 1.
     char respostaerror2c[4]={'A','E','2','Z'};         //Definim el array que s'envia al mestre en cas d'error 2.
-    char respostac_part1[3]={'A','C','0'};             //En cas de ser la comanda correcte, treiem missatge amb codi de retorn '0 = OK', s'hi afegeix el valor de l'entrada.
-    char respostac_part3[1]={'Z'};
-    char adc[20];
+    char adc[4];                                       //Buffer en el qual s'hi guardarà el valor del convertidor en 4 xifres.
     
-    int error = 0;
+    int error = 0;                                     //Variable que s'incrementa cada cop que trobem una segona 'A' abans de la 'Z'.
 
-    for (int index = 1; index < caracters; index++){  //Avaluem cada caracter del buffer des de la posició 1, en cas d'haver-hi una altra 'A',
-      if( comandac[index] == 'A' ){                   //que no estigui en la posició 1, incrementem la variable error que farà enviar una resposta d'error.
+    for (int index = 1; index < caracters; index++){   //Avaluem cada caracter del buffer des de la posició 1, en cas d'haver-hi una altra 'A',
+      if( comandac[index] == 'A' ){                    //que no estigui en la posició 1, incrementem la variable error que farà enviar una resposta d'error.
         error = error + 1;
       }
     }
 
-    if(comandac[2] != 'Z' || error > 0){              //Si no hi ha una 'Z' a la posició 5, o hi ha més d'una 'A', enviem error 1.
+    if(comandac[2] != 'Z' || error > 0){               //Si no hi ha una 'Z' a la posició 5, o hi ha més d'una 'A', enviem error 1.
       DEBUG(respostaerror1c,4);
-    }else if(PARADA == HIGH){                         //Comprobem que la entrada estigui entre 0 i 13, que són els pins d'Arduino, sinò, enviem el missatge d'error 2.
+    }else if(PARADA == HIGH){                          //Comprobem que la entrada estigui entre 0 i 13, que són els pins d'Arduino, sinò, enviem el missatge d'error 2.
       DEBUG(respostaerror2c,4);
-    }else if(PARADA == LOW){                          //Avaluem en cas que el valor llegit de l'entrada sigui 1.
-            String(respostac_part1);
-            String(respostac_part3);
-            String(respostac_complerta_string);
-            respostac_complerta_string = respostac_part1 + *punter_valor_ADC + respostac_part3;
-            respostac_complerta_string.toCharArray(adc,8);
-            DEBUG(adc,8);
+    }else if(PARADA == LOW){                           //Avaluem en cas que el valor llegit de l'entrada sigui 1.
+            sprintf(adc, "%04d", valor_ADC);           //Emmagatzemem al Buffer "adc" el valor del convertidor expresat en 4 xifres, posant zeros a l'esquerra qual cal.
+            Serial.print("AC0");                       //Treiem pel monitor sèrie el missatge en l'ordre correcte.
+            Serial.print(adc);
+            Serial.println("Z");
       }
 }
 
 
+void temporitzador(){
+   //_________________________________________________________________CONFIGURACIÓ TIMER_____________________________________________________________________________________________________________________________
+ noInterrupts();                                           //Parem totes les interrupcions abans de configurar el timer.
+ TCCR1A = 0;                                               //El registre de control A queda tot a 0.
+ TCCR1B = 0;                                               //El registre de control B queda tot a 0.
+ TCNT1 = 0;                                                //Inicialitzem el comptador a 0.
+ 
+ OCR1A = 15625;                                            //Quan el valor del comptador (TCNT1) és igual a OCR1A, s'activa interrupció. Generem una interrupsció cada segon.
+ TCCR1B |= (1 << WGM12);                                   //Activem el mode CTC en Timer1. El mode CTC ens permet comptar fins a un valor i reiniciar el comptatge un cop el valor ha estat assolit. 
+ TCCR1B |= (1 << CS12)|(0 << CS11)|(1 << CS10);            //Definim el PREESCALER per dividir la freqüència (16MHz) entre 1024, així, fixarem el registre comparador de sortida a (16.000.000/PREESCALER*(1/temps de mostratge)). Generem una interrupció cada segon.
+ TIMSK1 |= (1 << OCIE1A);                                  //Registre de configuració d'interrupció. En el nostre cas, el bit OCIEnA que ha d’estar en 1 per indicar al nostre temporitzador que usarem el registre OCRnA per al comparador. 
+ interrupts();                                             //Activem les interrupcions novament.
+ //________________________________________________________________________________________________________________________________________________________________________________________________________________                            
+}
 
 
-
-ISR(TIMER1_COMPB_vect){
-    *punter_comptador ++;
-    if(comptador == mostreig){      
+ISR(TIMER1_COMPA_vect){
+    *punter_comptador = comptador + 1;                     //Com que el Timer genera una interrupció cada segon, les anem comptant, i quan arriba al nombre de segons que volem, convertim i treiem per pantalla.
+    if(comptador == mostreig && PARADA == LOW){            //Afegim la condició que es converteixi sempre que estiguem en mode marxa.
       *punter_valor_ADC = analogRead(5);                   //Treiem pel port sèrie els valor de la conversió, i tornem a posar el bit a 0.
       Serial.println(valor_ADC);
-      *punter_comptador=0;
-    }
+      *punter_comptador=0;                                 //Tornem a inicialitzar la variable "comptador" a 0.
+    }    
 }
+
+
+
+
