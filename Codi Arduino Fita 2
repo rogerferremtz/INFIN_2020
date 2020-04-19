@@ -44,7 +44,7 @@ void setup()
 //________________________________________________________________________________________________________________________________________________________________________________________________________________
 */
 
-
+  *punter_PARADA = HIGH;                             //El sistema ha de començar en mode PARADA.
 
 }
 
@@ -99,14 +99,19 @@ int operaciom(char comandam[20], int caracters){      //Funció un cop s'ens ha 
     }else if(mostreig > 20 || mostreig < 1){          //Comprobem que el temps de mostratge rebut estigui entre 1 i 20,
       DEBUG(respostaerror2m,4);                       //sinò, enviem el missatge d'error 2.
       }else{                                          
-        DEBUG(respostam,4);                           //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
         if(comandam[2]=='1'){
+          DEBUG(respostam,4);                         //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
           *punter_PARADA = LOW;                       //En cas de posar en marxa la conversió, posem la variable PARADA a LOW, i inicialitzem la variable "comptador" a 0.
           *punter_comptador = 0;
           temporitzador();                            //Cridem a la funció que configura el Timer.
         }else if(comandam[2]=='0'){                   //Si rebem indicació de PARADA, treiem pel monitor sèrie els últims valors llegits.
-          *punter_PARADA = HIGH;                      //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
-          Serial.println(valor_ADC);
+          if (PARADA == LOW){
+            DEBUG(respostam,4);                       //En cas de no haver-hi cap error, enviem la resposta amb codi de error '0 = OK'.
+            *punter_PARADA = HIGH;                    //En cas de aturar la conversió, posem la variable PARADA a HIGH, i treiem pel monitor el valor de la última conversió de l'ADC.
+            Serial.println(valor_ADC);
+          }else {
+            DEBUG(respostaerror2m,4);
+          }
         }
       }
 }
@@ -179,7 +184,7 @@ void operacioe(char comandae[20], int caracters){
 
 void operacioc(char comandac[20], int caracters){
     char respostaerror1c[4]={'A','C','1','Z'};         //Definim el array que s'envia al mestre en cas d'error 1.
-    char respostaerror2c[4]={'A','E','2','Z'};         //Definim el array que s'envia al mestre en cas d'error 2.
+    char respostaerror2c[4]={'A','C','2','Z'};         //Definim el array que s'envia al mestre en cas d'error 2.
     char adc[4];                                       //Buffer en el qual s'hi guardarà el valor del convertidor en 4 xifres.
     
     int error = 0;                                     //Variable que s'incrementa cada cop que trobem una segona 'A' abans de la 'Z'.
@@ -227,7 +232,3 @@ ISR(TIMER1_COMPA_vect){
       *punter_comptador=0;                                 //Tornem a inicialitzar la variable "comptador" a 0.
     }    
 }
-
-
-
-
