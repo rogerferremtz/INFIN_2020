@@ -1,0 +1,139 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <sys/types.h>                                                    
+#include <sys/stat.h>                                                     
+#include <fcntl.h>                                                        
+#include <termios.h>                                                    
+#include <strings.h>
+#include <unistd.h>
+#include <sys/ioctl.h> 
+
+#define SIZE_OF_BUFFER 3
+#define BAUDRATE B9600                                                
+#define MODEMDEVICE "/dev/ttyS0"   			//Conexió IGEP - Arduino.
+//#define MODEMDEVICE "/dev/ttyUSB0"        //Conexió directa PC(Linux) - Arduino.
+#define _POSIX_SOURCE 1 					// POSIX compliant source.
+
+
+int tmostr;
+int nmostr;
+bool modemarxa = true;
+
+struct termios oldtio,newtio;   			//Estructura del codi per comunicar amb l'arduino.
+
+//Prototipus de les funcions
+void Param_Marxa(void);
+void buffer(void); //Li haurem d'enviar el valor de temperatura en graus centígrats.
+int ConfigurarSerie(void);
+void TancarSerie(int);
+
+int main (){
+	Param_Marxa();
+	//buffer();
+	
+
+}
+
+int	ConfigurarSerie(void){
+	int fd;                                                           
+
+
+	fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );                             
+	if (fd <0) {perror(MODEMDEVICE); exit(-1); }                            
+
+	tcgetattr(fd,&oldtio); /* save current port settings */                 
+
+	bzero(&newtio, sizeof(newtio));                                         
+	//newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;             
+	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;             
+	newtio.c_iflag = IGNPAR;                                                
+	newtio.c_oflag = 0;                                                     
+
+	/* set input mode (non-canonical, no echo,...) */                       
+	newtio.c_lflag = 0;                                                     
+
+	newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */         
+	newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */ 
+
+	tcflush(fd, TCIFLUSH);                                                  
+	tcsetattr(fd,TCSANOW,&newtio);
+	
+	sleep(2); //Per donar temps a que l'Arduino es recuperi del RESET
+	
+	return fd;
+}               
+
+void TancarSerie(fd){
+	tcsetattr(fd,TCSANOW,&oldtio);
+	close(fd);
+}
+
+void Param_Marxa(void){								   				//Funció per a demanar a l'usuari que entri els paràmetres de marxa abans d'enviar-ho al servidor
+
+	printf("\nEntra el temps de mostreig (1-20s):");
+	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig
+	while (tmostr>20 || tmostr<1)									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
+	 {
+		printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar
+		scanf("%d",&tmostr);											
+	 }
+								
+	printf ("AM1%.2dZ\n",tmostr/2);									//Es concatenen els valors entrats per l'usuari en el format exigit "A M v Temps Temps Z \n", éssent el temps la meitat de l'entrat per consola.
+	
+	modemarxa = true;
+}
+
+void buffer(){
+	/* CONFIGURACIÓ ARRAY CIRCULAR */
+	
+	int arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
+	int numeroceldas = 0;								//Nombre de valors en el buffer circular.
+	int indexLlegir = 0;								//Índex al punter de lectura.
+	int indexEscriure = 0;								//Índex al punter d'escriptura.
+	//int variableperguardar = 0;
+	bool sortir = false;								//Variable per provar que funciona el buffer.
+	
+	int opcio = 0;										//Variable de prova.
+	while(sortir != true){
+	printf("Entra l'opció, 1 per escriure, 0 per llegir o 2 per sortir.\n");
+	scanf("%d",&opcio);
+	
+	
+
+	/* Opció escriptura */
+	if(opcio == 1){
+		if(modemarxa == true){
+			printf("Entra numero\n");
+			scanf("%d",&arraycircular[indexEscriure]);
+				
+			numeroceldas++;
+			indexEscriure++;
+			
+			printf("Actualment hi ha %d mostres guardades\n",numeroceldas);
+			
+			if(indexEscriure == SIZE_OF_BUFFER){
+				indexEscriure = 0;
+				numeroceldas = numeroceldas -1;
+			}
+		}
+	}
+	
+	/*Opció lectura*/
+	if(opcio == 0){
+		if(numeroceldas == 0){
+			printf("Buffer buit\n");
+		}
+		printf("Escrigui el valor que vol conèixer\n");
+		scanf("%d", &indexLlegir);
+		printf("El valor emmagatzemat és %d\n",arraycircular[indexLlegir]);
+		//arraycircular[indexLlegir] = NULL;
+
+	}
+	/*Opció sortir*/
+		if(opcio == 2){
+			sortir = true;
+		}
+	}
+
+}
