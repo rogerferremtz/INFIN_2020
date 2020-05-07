@@ -8,17 +8,27 @@
 #include <strings.h>
 #include <unistd.h>
 #include <sys/ioctl.h> 
+#include <string.h>
 
 #define SIZE_OF_BUFFER 3
 #define BAUDRATE B9600                                                
-#define MODEMDEVICE "/dev/ttyS0"   			//Conexió IGEP - Arduino.
-//#define MODEMDEVICE "/dev/ttyUSB0"        //Conexió directa PC(Linux) - Arduino.
+//#define MODEMDEVICE "/dev/ttyS0"   			//Conexió IGEP - Arduino.
+#define MODEMDEVICE "/dev/ttyACM0"        //Conexió directa PC(Linux) - Arduino.
 #define _POSIX_SOURCE 1 					// POSIX compliant source.
 
 
 int tmostr;
 int nmostr;
 bool modemarxa = true;
+
+int fd, i = 0, res, res1, res2;                                                           
+char buf[255];
+char missatge[255];
+union{
+	long int i;
+	char	c[4];
+}conversio;
+int bytes;
 
 struct termios oldtio,newtio;   			//Estructura del codi per comunicar amb l'arduino.
 
@@ -27,6 +37,7 @@ void Param_Marxa(void);
 void buffer(void); //Li haurem d'enviar el valor de temperatura en graus centígrats.
 int ConfigurarSerie(void);
 void TancarSerie(int);
+int entradadevalors();
 
 int main (){
 	Param_Marxa();
@@ -78,10 +89,27 @@ void Param_Marxa(void){								   				//Funció per a demanar a l'usuari que ent
 		printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar
 		scanf("%d",&tmostr);											
 	 }
-								
-	printf ("AM1%.2dZ\n",tmostr/2);									//Es concatenen els valors entrats per l'usuari en el format exigit "A M v Temps Temps Z \n", éssent el temps la meitat de l'entrat per consola.
-	
+
+/************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
+					
+	sprintf(missatge,"AM1%.2dZ\n",tmostr/2);
+	//sprintf(missatge,"AS130Z");
+
+	res = write(fd,missatge,strlen(missatge));
+
+	if (res <0) {tcsetattr(fd,TCSANOW,&oldtio); perror(MODEMDEVICE); exit(-1); }
+
+	printf("Enviats %d bytes: ",res);
+	for (i = 0; i < res; i++)
+	{
+		printf("%c",missatge[i]);
+	}
+	printf("\n");
+
+/********************************************************************************************************/	
 	modemarxa = true;
+	
+	entradadevalors();
 }
 
 void buffer(){
@@ -127,7 +155,7 @@ void buffer(){
 		printf("Escrigui el valor que vol conèixer\n");
 		scanf("%d", &indexLlegir);
 		printf("El valor emmagatzemat és %d\n",arraycircular[indexLlegir]);
-		//arraycircular[indexLlegir] = NULL;
+		arraycircular[indexLlegir] = NULL;
 
 	}
 	/*Opció sortir*/
@@ -137,3 +165,29 @@ void buffer(){
 	}
 
 }
+
+int entradadevalors(){
+	//Abans de rebre:
+	//Esperem un segon
+	sleep(1);
+	
+	//Mirem quans bytes ens ha enviat l'Arduino
+  	ioctl(fd, FIONREAD, &bytes);
+  	printf("Anem a rebre %d byte(s)\n",bytes);
+
+	//Rebem
+	res1 = read(fd,buf,1);
+	res2 = read(fd,buf+1,1);
+	res = res1 + res2;
+
+	printf("Rebuts %d bytes: ",res);
+	for (i = 0; i < res; i++)
+	{
+		printf("0x%x ",buf[i]);
+	}
+	printf("\n");
+                                                                   
+	TancarSerie(fd);
+}
+
+
