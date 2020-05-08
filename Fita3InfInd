@@ -14,65 +14,68 @@
 #include <termios.h>       
 #include <sys/ioctl.h>
 
-#define SIZE_OF_BUFFER 3
-#define BAUDRATE B9600                                                
-//#define MODEMDEVICE "/dev/ttyS0"   			//Conexió IGEP - Arduino.
-#define MODEMDEVICE "/dev/ttyACM0"        //Conexió directa PC(Linux) - Arduino.
-#define _POSIX_SOURCE 1 					// POSIX compliant source.
 
 
-int tmostr;
-int nmostr;
-bool modemarxa = true;
+#define SIZE_OF_BUFFER 3				//Tamany buffer circular.
+#define BAUDRATE B9600                  //Velocitat comunicació sèrie.                           
+//#define MODEMDEVICE "/dev/ttyS0"   	//Conexió IGEP - Arduino.
+#define MODEMDEVICE "/dev/ttyACM0"      //Conexió directa PC(Linux) - Arduino.
+#define _POSIX_SOURCE 1 				// POSIX compliant source.
 
-int fd, i = 0, res, res1, res2;                                                           
-char buf[255];
-char missatge[255];
+
+
+int tmostr;								//Temps de mostratge entrat per la consola.
+bool modemarxa = true;					//Variable booleana que ens indica si l'Arduino està llegint dades.
+int fd, i = 0, res, res1, res2;         //Variables usades per saber el nombre de bytes que ens comunica l'Arduino.                                                
+char buf[255];							//Array de chars on s'emmagatzema el valor rebut de l'Arduino.
+char missatge[255];						//Array de chars que inclou el missatge que s'envia a l'Arduino.
+char missatgeled[255];					//Array de chars que inclou el missatge que ordena encendre o apagar el LED.
 union{
 	long int i;
 	char	c[4];
 }conversio;
 int bytes;
+	float arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
+	int numeroceldas = 0;									//Nombre de valors en el buffer circular.
+	int indexLlegir = 0;									//Índex al punter de lectura.
+	int indexEscriure = 0;									//Índex al punter d'escriptura.
+	//bool sortir = false;									//Variable per provar que funciona el buffer.
 
-struct termios oldtio,newtio;   			//Estructura del codi per comunicar amb l'arduino.
 
-//Prototipus de les funcions
-int Param_Marxa();
-void buffer(void); //Li haurem d'enviar el valor de temperatura en graus centígrats.
-int ConfigurarSerie(void);
-void TancarSerie(int);
-int entradadevalors();
+struct termios oldtio,newtio;   		//Estructura del codi per comunicar amb l'arduino.
+
+
+
+/*******************************Prototipus de les funcions***********************************************************/
+
+void Param_Marxa();						//Funció que envia l'ordre de marxa.
+void buffer(float); 						//Li haurem d'enviar el valor de temperatura en graus centígrats.
+int ConfigurarSerie(void);				//Funció que configura el port sèrie.
+void TancarSerie(int);					//Funció que tanca el port sèrie.
+void demanarmostra(int);					//Funció que demana la mostra llegida per l'Arduino.
+
+/********************************************************************************************************************/
 
 int main (){
 	Param_Marxa();
-	//buffer();
-	
-
 }
 
 int	ConfigurarSerie(void){
     fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );                             
-	if (fd <0) {perror(MODEMDEVICE); exit(-1); }                            
-
-	tcgetattr(fd,&oldtio); /* save current port settings */                 
-
+	if (fd <0) {perror(MODEMDEVICE); exit(-1); }
+	tcgetattr(fd,&oldtio); /* save current port settings */
 	bzero(&newtio, sizeof(newtio));                                         
 	//newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;             
 	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;             
 	newtio.c_iflag = IGNPAR;                                                
-	newtio.c_oflag = 0;                                                     
-
+	newtio.c_oflag = 0;
 	/* set input mode (non-canonical, no echo,...) */                       
-	newtio.c_lflag = 0;                                                     
-
+	newtio.c_lflag = 0;
 	newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */         
-	newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */ 
-
+	newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */
 	tcflush(fd, TCIFLUSH);                                                  
-	tcsetattr(fd,TCSANOW,&newtio);
-	
-	sleep(2); //Per donar temps a que l'Arduino es recuperi del RESET
-	
+	tcsetattr(fd,TCSANOW,&newtio);	
+	sleep(2); //Per donar temps a que l'Arduino es recuperi del RESET	
 	return fd;
 }               
 
@@ -81,112 +84,75 @@ void TancarSerie(fd){
 	close(fd);
 }
 
-int Param_Marxa(){								   				//Funció per a demanar a l'usuari que entri els paràmetres de marxa abans d'enviar-ho al servidor
-
-	printf("\nEntra el temps de mostreig (1-20s):");
-	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig
-	while (tmostr>20 || tmostr<1)									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
-	 {
-		printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar
+void Param_Marxa(){
+	
+	printf("\nEntra el temps de mostreig (1-20s):");				//Es demana el temps de mostreig desitjat.
+	
+	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig.
+	
+	while (tmostr>20 || tmostr<1){									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
+	 	printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar.
 		scanf("%d",&tmostr);											
 	 }
 
 /************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
 	fd = ConfigurarSerie();
 
-	// Enviar el missatge 1
-	sprintf(missatge,"AM1%.2dZ\n",tmostr/2);
+	sprintf(missatge,"AM1%.2dZ\n",tmostr/2);										//Ordre de marxa, amb temps de mostratge la meitat del entrat per consola.
 
 	res = write(fd,missatge,strlen(missatge));
 
 	if (res <0) {tcsetattr(fd,TCSANOW,&oldtio); perror(MODEMDEVICE); exit(-1); }
 
 	printf("Enviats %d bytes: ",res);
-	for (i = 0; i < res; i++)
-	{
+	
+	for (i = 0; i < res; i++){
 		printf("%c",missatge[i]);
 	}
+	
 	printf("\n");
 	
-	modemarxa = true;
+	modemarxa = true;																//Establim que estem en mode 'MARXA'.
 	
-	sleep(1);
-	res = read(fd,buf,1); //CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
-	res = res + read(fd,buf+1,1);
-	res = res + read(fd,buf+2,1);
-	res = res + read(fd,buf+3,1);
-	//printf("Rebuts %d bytes: ",res);
-	for (i = 0; i < res; i++)
-	{
-		printf("%c",buf[i]);
+	while(modemarxa==true){															//Sempre que estiguem en mode marxa, anem demanant la Operació 'C' amb període igual al temps entrat per consola.
+		demanarmostra(tmostr);
 	}
-	printf("\n");
-	
-	while(modemarxa==true){
-		res = read(fd,buf,1); //CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
-		res = res + read(fd,buf+1,1);
-		res = res + read(fd,buf+2,1);
-		res = res + read(fd,buf+3,1);
-		//printf("Rebuts %d bytes: ",res);
-		int temperatura = atoi(buf);
-		printf("%d", temperatura);
-		/*for (i = 0; i < res; i++)
-		{
-			
-			printf("%c",buf[i]);
-		}*/
-		printf("\n");
-		
-	}
-																	   
-	TancarSerie(fd);
-
-
-	
-	return 0;
-
-
 /********************************************************************************************************/	
 	
 }
 
-void buffer(){
-	/* CONFIGURACIÓ ARRAY CIRCULAR */
+void buffer(float variableperguardar){
+/*******************************************CONFIGURACIÓ BUFFER CIRCULAR ********************************/
 	
-	int arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
-	int numeroceldas = 0;								//Nombre de valors en el buffer circular.
-	int indexLlegir = 0;								//Índex al punter de lectura.
-	int indexEscriure = 0;								//Índex al punter d'escriptura.
-	//int variableperguardar = 0;
-	bool sortir = false;								//Variable per provar que funciona el buffer.
+
 	
-	int opcio = 0;										//Variable de prova.
+	/*int opcio = 0;										//Variable de prova.
 	while(sortir != true){
 	printf("Entra l'opció, 1 per escriure, 0 per llegir o 2 per sortir.\n");
-	scanf("%d",&opcio);
+	scanf("%d",&opcio);*/
 	
 	
 
 	/* Opció escriptura */
-	if(opcio == 1){
-		if(modemarxa == true){
-			printf("Entra numero\n");
-			scanf("%d",&arraycircular[indexEscriure]);
-				
+	//if(opcio == 1){
+		//if(modemarxa == true){
+			//printf("Entra numero\n");
+			//scanf("%f",&arraycircular[indexEscriure]);
+			arraycircular[indexEscriure]=variableperguardar;
 			numeroceldas++;
 			indexEscriure++;
 			
-			printf("Actualment hi ha %d mostres guardades\n",numeroceldas);
+			printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
 			
 			if(indexEscriure == SIZE_OF_BUFFER){
 				indexEscriure = 0;
 				numeroceldas = numeroceldas -1;
 			}
-		}
-	}
+		//}
+	//}
 	
 	/*Opció lectura*/
-	if(opcio == 0){
+	/*if(opcio == 0){
 		if(numeroceldas == 0){
 			printf("Buffer buit\n");
 		}
@@ -194,11 +160,49 @@ void buffer(){
 		scanf("%d", &indexLlegir);
 		printf("El valor emmagatzemat és %d\n",arraycircular[indexLlegir]);
 	}
-	/*Opció sortir*/
+	//Opció sortir
 		if(opcio == 2){
 			sortir = true;
-		}
+		}*/
 	}
+/********************************************************************************************************/
 
+
+void demanarmostra(int temps){
+	/************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
+	fd = ConfigurarSerie();
+
+	sprintf(missatge,"ACZ\n");														//Enviem l'ordre de l'Operació 'C'.
+
+	res1 = write(fd,missatge,strlen(missatge));
+
+	if (res1 <0) {tcsetattr(fd,TCSANOW,&oldtio); perror(MODEMDEVICE); exit(-1); }
+
+		
+	sleep(1);
+	res1 = read(fd,buf,1); 															//CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
+	res1 = res1 + read(fd,buf+1,1);													//Rebem de l'Arduino 7 bytes.
+	res1 = res1 + read(fd,buf+2,1);
+	res1 = res1 + read(fd,buf+3,1);
+	res1 = res1 + read(fd,buf+4,1);
+	res1 = res1 + read(fd,buf+5,1);
+	res1 = res1 + read(fd,buf+6,1);
+	//res = res + read(fd,buf+7,1);
+		
+		
+	int milers = buf[3]-'0';														//Convertim la dada comunicada de char a integer.
+	int centenes = buf[4]-'0';
+	int desenes = buf[5]-'0';
+	int unitats = buf[6]-'0';
+	int temperatura = milers*1000+centenes*100+desenes*10+unitats;					//Formem una mateixa dada, que va de 0 a 1023.
+	//printf("%d\n",temperatura);
+	float temperaturaengraus = (temperatura*70)/1023;
+	printf("Hem rebut %d, i en graus centígrads és %0.2f\n",temperatura, temperaturaengraus);
+	
+
+	buffer(temperaturaengraus);
+
+	
+	TancarSerie(fd);	
 }
 
