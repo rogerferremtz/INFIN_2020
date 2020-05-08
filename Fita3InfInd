@@ -1,14 +1,18 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <sys/types.h>                                                    
-#include <sys/stat.h>                                                     
-#include <fcntl.h>                                                        
-#include <termios.h>                                                    
-#include <strings.h>
-#include <unistd.h>
-#include <sys/ioctl.h> 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <string.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <fcntl.h>                                                        
+#include <termios.h>       
+#include <sys/ioctl.h>
 
 #define SIZE_OF_BUFFER 3
 #define BAUDRATE B9600                                                
@@ -33,7 +37,7 @@ int bytes;
 struct termios oldtio,newtio;   			//Estructura del codi per comunicar amb l'arduino.
 
 //Prototipus de les funcions
-void Param_Marxa(void);
+int Param_Marxa();
 void buffer(void); //Li haurem d'enviar el valor de temperatura en graus centígrats.
 int ConfigurarSerie(void);
 void TancarSerie(int);
@@ -47,10 +51,7 @@ int main (){
 }
 
 int	ConfigurarSerie(void){
-	int fd;                                                           
-
-
-	fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );                             
+    fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );                             
 	if (fd <0) {perror(MODEMDEVICE); exit(-1); }                            
 
 	tcgetattr(fd,&oldtio); /* save current port settings */                 
@@ -80,7 +81,7 @@ void TancarSerie(fd){
 	close(fd);
 }
 
-void Param_Marxa(void){								   				//Funció per a demanar a l'usuari que entri els paràmetres de marxa abans d'enviar-ho al servidor
+int Param_Marxa(){								   				//Funció per a demanar a l'usuari que entri els paràmetres de marxa abans d'enviar-ho al servidor
 
 	printf("\nEntra el temps de mostreig (1-20s):");
 	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig
@@ -91,9 +92,10 @@ void Param_Marxa(void){								   				//Funció per a demanar a l'usuari que ent
 	 }
 
 /************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
-					
+	fd = ConfigurarSerie();
+
+	// Enviar el missatge 1
 	sprintf(missatge,"AM1%.2dZ\n",tmostr/2);
-	//sprintf(missatge,"AS130Z");
 
 	res = write(fd,missatge,strlen(missatge));
 
@@ -105,11 +107,47 @@ void Param_Marxa(void){								   				//Funció per a demanar a l'usuari que ent
 		printf("%c",missatge[i]);
 	}
 	printf("\n");
-
-/********************************************************************************************************/	
+	
 	modemarxa = true;
 	
-	entradadevalors();
+	sleep(1);
+	res = read(fd,buf,1); //CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
+	res = res + read(fd,buf+1,1);
+	res = res + read(fd,buf+2,1);
+	res = res + read(fd,buf+3,1);
+	//printf("Rebuts %d bytes: ",res);
+	for (i = 0; i < res; i++)
+	{
+		printf("%c",buf[i]);
+	}
+	printf("\n");
+	
+	while(modemarxa==true){
+		res = read(fd,buf,1); //CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
+		res = res + read(fd,buf+1,1);
+		res = res + read(fd,buf+2,1);
+		res = res + read(fd,buf+3,1);
+		//printf("Rebuts %d bytes: ",res);
+		int temperatura = atoi(buf);
+		printf("%d", temperatura);
+		/*for (i = 0; i < res; i++)
+		{
+			
+			printf("%c",buf[i]);
+		}*/
+		printf("\n");
+		
+	}
+																	   
+	TancarSerie(fd);
+
+
+	
+	return 0;
+
+
+/********************************************************************************************************/	
+	
 }
 
 void buffer(){
@@ -155,8 +193,6 @@ void buffer(){
 		printf("Escrigui el valor que vol conèixer\n");
 		scanf("%d", &indexLlegir);
 		printf("El valor emmagatzemat és %d\n",arraycircular[indexLlegir]);
-		arraycircular[indexLlegir] = NULL;
-
 	}
 	/*Opció sortir*/
 		if(opcio == 2){
@@ -165,29 +201,4 @@ void buffer(){
 	}
 
 }
-
-int entradadevalors(){
-	//Abans de rebre:
-	//Esperem un segon
-	sleep(1);
-	
-	//Mirem quans bytes ens ha enviat l'Arduino
-  	ioctl(fd, FIONREAD, &bytes);
-  	printf("Anem a rebre %d byte(s)\n",bytes);
-
-	//Rebem
-	res1 = read(fd,buf,1);
-	res2 = read(fd,buf+1,1);
-	res = res1 + res2;
-
-	printf("Rebuts %d bytes: ",res);
-	for (i = 0; i < res; i++)
-	{
-		printf("0x%x ",buf[i]);
-	}
-	printf("\n");
-                                                                   
-	TancarSerie(fd);
-}
-
 
