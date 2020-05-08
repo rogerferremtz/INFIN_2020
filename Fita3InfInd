@@ -30,6 +30,7 @@ int fd, i = 0, res, res1, res2;         //Variables usades per saber el nombre d
 char buf[255];							//Array de chars on s'emmagatzema el valor rebut de l'Arduino.
 char missatge[255];						//Array de chars que inclou el missatge que s'envia a l'Arduino.
 char missatgeled[255];					//Array de chars que inclou el missatge que ordena encendre o apagar el LED.
+float temperaturaengraus=0;				//Variable de temperatura llegida d'arduino
 union{
 	long int i;
 	char	c[4];
@@ -196,13 +197,27 @@ void demanarmostra(int temps){
 	int unitats = buf[6]-'0';
 	int temperatura = milers*1000+centenes*100+desenes*10+unitats;					//Formem una mateixa dada, que va de 0 a 1023.
 	//printf("%d\n",temperatura);
-	float temperaturaengraus = (temperatura*70)/1023;
+	temperaturaengraus = (temperatura*70)/1023;
 	printf("Hem rebut %d, i en graus centígrads és %0.2f\n",temperatura, temperaturaengraus);
 	
-
+	
 	buffer(temperaturaengraus);
 
 	
 	TancarSerie(fd);	
 }
+void registremax_min(){
+	float max=0;
+	float min=70;
+	
+	if (temperaturaengraus>max){
+		temperaturaengraus=max;
+		printf("El nou màxim és %0.2f\n", max);		
+	}
+	if (temperaturaengraus<min){
+		temperaturaengraus=min;
+		printf("El nou mínim és %0.2f\n", min);
+	}
+}
 
+	
