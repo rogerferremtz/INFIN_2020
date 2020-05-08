@@ -30,17 +30,19 @@ int fd, i = 0, res, res1, res2;         //Variables usades per saber el nombre d
 char buf[255];							//Array de chars on s'emmagatzema el valor rebut de l'Arduino.
 char missatge[255];						//Array de chars que inclou el missatge que s'envia a l'Arduino.
 char missatgeled[255];					//Array de chars que inclou el missatge que ordena encendre o apagar el LED.
-float temperaturaengraus=0;				//Variable de temperatura llegida d'arduino
 union{
 	long int i;
 	char	c[4];
 }conversio;
 int bytes;
-	float arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
-	int numeroceldas = 0;									//Nombre de valors en el buffer circular.
-	int indexLlegir = 0;									//Índex al punter de lectura.
-	int indexEscriure = 0;									//Índex al punter d'escriptura.
-	//bool sortir = false;									//Variable per provar que funciona el buffer.
+float arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
+int numeroceldas = 0;									//Nombre de valors en el buffer circular.
+int indexLlegir = 0;									//Índex al punter de lectura.
+int indexEscriure = 0;									//Índex al punter d'escriptura.
+//bool sortir = false;									//Variable per provar que funciona el buffer.
+	
+float max=0;
+float min=70;
 
 
 struct termios oldtio,newtio;   		//Estructura del codi per comunicar amb l'arduino.
@@ -50,10 +52,11 @@ struct termios oldtio,newtio;   		//Estructura del codi per comunicar amb l'ardu
 /*******************************Prototipus de les funcions***********************************************************/
 
 void Param_Marxa();						//Funció que envia l'ordre de marxa.
-void buffer(float); 						//Li haurem d'enviar el valor de temperatura en graus centígrats.
+void buffer(float); 					//Li haurem d'enviar el valor de temperatura en graus centígrats.
 int ConfigurarSerie(void);				//Funció que configura el port sèrie.
 void TancarSerie(int);					//Funció que tanca el port sèrie.
-void demanarmostra(int);					//Funció que demana la mostra llegida per l'Arduino.
+void demanarmostra(int);				//Funció que demana la mostra llegida per l'Arduino.
+void registremax_min(float);			//Finció que emmagatzema els valors màxims i mínims.
 
 /********************************************************************************************************************/
 
@@ -143,7 +146,7 @@ void buffer(float variableperguardar){
 			numeroceldas++;
 			indexEscriure++;
 			
-			printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
+			//printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
 			
 			if(indexEscriure == SIZE_OF_BUFFER){
 				indexEscriure = 0;
@@ -197,27 +200,29 @@ void demanarmostra(int temps){
 	int unitats = buf[6]-'0';
 	int temperatura = milers*1000+centenes*100+desenes*10+unitats;					//Formem una mateixa dada, que va de 0 a 1023.
 	//printf("%d\n",temperatura);
-	temperaturaengraus = (temperatura*70)/1023;
+	float temperaturaengraus = (temperatura*70)/1023;
 	printf("Hem rebut %d, i en graus centígrads és %0.2f\n",temperatura, temperaturaengraus);
 	
-	
+
 	buffer(temperaturaengraus);
+	registremax_min(temperaturaengraus);
 
 	
 	TancarSerie(fd);	
 }
-void registremax_min(){
-	float max=0;
-	float min=70;
+
+void registremax_min(float temperatura){
+
 	
-	if (temperaturaengraus>max){
-		temperaturaengraus=max;
+	if (temperatura>max){
+		max=temperatura;
 		printf("El nou màxim és %0.2f\n", max);		
 	}
-	if (temperaturaengraus<min){
-		temperaturaengraus=min;
+	if (temperatura<min){
+		min=temperatura;
 		printf("El nou mínim és %0.2f\n", min);
 	}
 }
+
 
 	
