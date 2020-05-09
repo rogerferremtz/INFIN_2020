@@ -17,7 +17,7 @@
 
 
 
-#define SIZE_OF_BUFFER 3				//Tamany buffer circular.
+#define SIZE_OF_BUFFER 100				//Tamany buffer circular.
 #define BAUDRATE B9600                  //Velocitat comunicació sèrie.                           
 //#define MODEMDEVICE "/dev/ttyS0"   	//Conexió IGEP - Arduino.
 #define MODEMDEVICE "/dev/ttyACM0"      //Conexió directa PC(Linux) - Arduino.
@@ -56,17 +56,17 @@ struct termios oldtio,newtio;   		//Estructura del codi per comunicar amb l'ardu
 /*******************************Prototipus de les funcions***********************************************************/
 
 void Param_Marxa();						//Funció que envia l'ordre de marxa.
-void buffer(float); 					//Li haurem d'enviar el valor de temperatura en graus centígrats.
+void buffer(float); 					//Funció que emmagatzema les temperatures registrades.
 int ConfigurarSerie(void);				//Funció que configura el port sèrie.
 void TancarSerie(int);					//Funció que tanca el port sèrie.
 void demanarmostra(int);				//Funció que demana la mostra llegida per l'Arduino.
 void registremax_min(float);			//Funció que emmagatzema els valors màxims i mínims.
+int tiempo();							//Funció que compta segons.
 
 /********************************************************************************************************************/
 
 int main (){
-	Param_Marxa();
-	
+	Param_Marxa();	
 }
 
 int	ConfigurarSerie(void){
@@ -98,15 +98,15 @@ void Param_Marxa(){
 	printf("\nEntra el temps de mostreig (1-20s):");				//Es demana el temps de mostreig desitjat.
 	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig.
 	
-	while (tmostr>20 || tmostr<1){									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
+	while (tmostr>20 || tmostr<1){									//Comprovar si el valor entrat no està inclòs a l'intèrval estipulat per l'enunciat.
 	 	printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar.
 		scanf("%d",&tmostr);											
 	 }
 	
-	printf("\nEntra el nombre de valors dels quals es vol fer la mitjana:");
-	scanf("%d",&mitjana);
+	printf("\nEntra el nombre de valors dels quals es vol fer la mitjana:");	//Es demana el nombre de valors dels quals es vol fer la mitjana.
+	scanf("%d",&mitjana);														//L'usuari entra el nombre de valors.
 	
-	while (mitjana>100 || mitjana<2){									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
+	while (mitjana>100 || mitjana<2){									//Comprovar si el valor entrat no està inclòs a l'intèrval estipulat per l'enunciat.
 	 	printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");		//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar.
 		scanf("%d",&mitjana);											
 	 }
@@ -128,10 +128,13 @@ void Param_Marxa(){
 	
 	printf("\n");
 	
-	modemarxa = true;																//Establim que estem en mode 'MARXA'.
+	modemarxa = true;					//Establim que estem en mode 'MARXA'.
 	
-	while(modemarxa==true){															//Sempre que estiguem en mode marxa, anem demanant la Operació 'C' amb període igual al temps entrat per consola.
-		demanarmostra(tmostr);
+	while(modemarxa==true){				//Sempre que estiguem en mode marxa, cridem la funció "tiempo()", que compta segons.
+		int segons = tiempo();			
+		if(segons == tmostr){
+			demanarmostra(tmostr);		//Un cop la funció "tiempo()" hagi comptat els segons que han estat entrats per l'usuari, cridem la funció que envia l'ordre "ACZ".
+		}
 	}
 /********************************************************************************************************/	
 	
@@ -140,27 +143,28 @@ void Param_Marxa(){
 void buffer(float variableperguardar){
 	
 
-	float suma=0;
+	float suma=0;			//Variable que emmagatzema la suma de les "X" temperatures de les quals volem fer la mitjana.
 
 /*******************************************CONFIGURACIÓ BUFFER CIRCULAR ********************************/
 	
 	arraycircular[indexEscriure]=variableperguardar;
-	numeroceldas++;
 	indexEscriure++;
+	if(numeroceldas != SIZE_OF_BUFFER){
+		numeroceldas++;
+	}
 	
-	printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
+	printf("Actualment hi ha %d mostres guardades de 100, mostra guardada és %0.2fºC\n",numeroceldas, arraycircular[indexEscriure-1]);	//Es notifica a l'usuari el nombre de mostres emmagatzemades i quina ha estat la última.
 	
 	if(indexEscriure == SIZE_OF_BUFFER){
 		indexEscriure = 0;
-		numeroceldas = numeroceldas -1;
 	}
 /********************************************************************************************************/
 
 		for(int i = indexEscriure -1; i >=(indexEscriure-mitjana); i--){
-			suma=suma + arraycircular[i];
+			suma=suma + arraycircular[i];											//Fem la suma de les "X" últimes mostres.
 		}
-		float mitja = suma/mitjana;
-		printf("La mitjana de les ultimes %d mostres és %f.\n", mitjana, mitja);
+		float mitja = suma/mitjana;													//Dividim la variable "suma" entre el nombre de temperatures sumades, fent així la mitjana.
+		printf("La mitjana de les ultimes %d mostres és %0.2fºC\n", mitjana, mitja);	//Treiem la informació per pantalla.
 
 	
 }
@@ -179,28 +183,29 @@ void demanarmostra(int temps){
 
 		
 	sleep(1);
-	res1 = read(fd,buf,1); 															//CAL REBRE DE UN EN UN PERQUE newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
+	res1 = read(fd,buf,1); 															//Cal rebre d'un byte en un byte perquè newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
 	res1 = res1 + read(fd,buf+1,1);													//Rebem de l'Arduino 7 bytes.
 	res1 = res1 + read(fd,buf+2,1);
 	res1 = res1 + read(fd,buf+3,1);
 	res1 = res1 + read(fd,buf+4,1);
 	res1 = res1 + read(fd,buf+5,1);
 	res1 = res1 + read(fd,buf+6,1);
-	//res = res + read(fd,buf+7,1);
+
 		
 		
-	int milers = buf[3]-'0';														//Convertim la dada comunicada de char a integer.
+	int milers = buf[3]-'0';														//Convertim les dades comunicades de char a integer.
 	int centenes = buf[4]-'0';
 	int desenes = buf[5]-'0';
 	int unitats = buf[6]-'0';
+	
 	int temperatura = milers*1000+centenes*100+desenes*10+unitats;					//Formem una mateixa dada, que va de 0 a 1023.
-	//printf("%d\n",temperatura);
-	float temperaturaengraus = (temperatura*70)/1023;
-	printf("Hem rebut %d, i en graus centígrads és %0.2f\n",temperatura, temperaturaengraus);
+
+	float temperaturaengraus = (temperatura*70)/1023;								//Convertim la dada rebuda de l'Arduino a graus centígrads.
+	printf("Hem rebut %d, que correspòn a  %0.2f ºC\n",temperatura, temperaturaengraus);
 	
 
-	buffer(temperaturaengraus);
-	registremax_min(temperaturaengraus);
+	buffer(temperaturaengraus);						//La temperatura, ja convertida a graus centígrads s'envia a la funció "buffer()" per emmagatzemar-la.
+	registremax_min(temperaturaengraus);			//La temperatura, ja convertida a graus centígrads s'envia a la funció "registremax_min", per actualitzar, si cal, els regístres de temperatura màxima i mínima.
 
 	
 	TancarSerie(fd);	
@@ -209,15 +214,30 @@ void demanarmostra(int temps){
 void registremax_min(float temperatura){
 
 	
-	if (temperatura>max){
+	if (temperatura>max){							//En cas de ser la nova temperatura superior a la que fins ara havia estat considerada com a màxima, esdevé la nova temperatura màxima.
 		max=temperatura;
-		//printf("El nou màxim és %0.2f\n", max);		
+		printf("El nou màxim és %0.2fºC\n", max);		
 	}
-	if (temperatura<min){
+	if (temperatura<min){							//En cas de ser la nova temperatura inferior a la que fins ara havia estat considerada com a mínima, esdevé la nova temperatura mínima.
 		min=temperatura;
-		//printf("El nou mínim és %0.2f\n", min);
+		printf("El nou mínim és %0.2fºC\n", min);
 	}
 }
 
-
+int tiempo(){						//Aquesta funció compta segons, està configurada per treure per pantalla el nombre de segons que va comptant, quan arriba al temps estipulat per "tmostr",
+									//finalitza la seva execució, permetent així l'execució de la funció "demanarmostra()".
+	clock_t t,ts;
+	int segundos=0;
+	ts=clock()+CLOCKS_PER_SEC;
+	for(;;){
+		if((t=clock())>=ts){
+		  printf("%d\n",++segundos);
+		  ts=t+CLOCKS_PER_SEC;
+		  if(segundos == tmostr){
+			break;
+		  }
+		}
+	}
+	return segundos;
+}
 
