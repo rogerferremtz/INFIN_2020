@@ -13,6 +13,7 @@
 #include <fcntl.h>                                                        
 #include <termios.h>       
 #include <sys/ioctl.h>
+#include <time.h>
 
 
 
@@ -36,13 +37,16 @@ union{
 }conversio;
 int bytes;
 float arraycircular[SIZE_OF_BUFFER] = { 0 };			//Definim el tamany del buffer.
-int numeroceldas = 0;									//Nombre de valors en el buffer circular.
 int indexLlegir = 0;									//Índex al punter de lectura.
 int indexEscriure = 0;									//Índex al punter d'escriptura.
-//bool sortir = false;									//Variable per provar que funciona el buffer.
+int numeroceldas = 0;									//Nombre de valors en el buffer circular.
+
 	
-float max=0;
-float min=70;
+float max=0;											//Variable que emmagatzema el valor màxim de temperatura mesurat.
+float min=70;											//Variable que emmagatzema el valor mínim de temperatura mesurat.
+int mitjana=0;											//VAriable que emmagatzema el nombre de temperatures del quals es vol fer la mitjana.
+
+
 
 
 struct termios oldtio,newtio;   		//Estructura del codi per comunicar amb l'arduino.
@@ -56,12 +60,13 @@ void buffer(float); 					//Li haurem d'enviar el valor de temperatura en graus c
 int ConfigurarSerie(void);				//Funció que configura el port sèrie.
 void TancarSerie(int);					//Funció que tanca el port sèrie.
 void demanarmostra(int);				//Funció que demana la mostra llegida per l'Arduino.
-void registremax_min(float);			//Finció que emmagatzema els valors màxims i mínims.
+void registremax_min(float);			//Funció que emmagatzema els valors màxims i mínims.
 
 /********************************************************************************************************************/
 
 int main (){
 	Param_Marxa();
+	
 }
 
 int	ConfigurarSerie(void){
@@ -91,14 +96,21 @@ void TancarSerie(fd){
 void Param_Marxa(){
 	
 	printf("\nEntra el temps de mostreig (1-20s):");				//Es demana el temps de mostreig desitjat.
-	
 	scanf("%d",&tmostr);											//L'usuari entra el temps de mostreig.
 	
 	while (tmostr>20 || tmostr<1){									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
 	 	printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");	//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar.
 		scanf("%d",&tmostr);											
 	 }
-
+	
+	printf("\nEntra el nombre de valors dels quals es vol fer la mitjana:");
+	scanf("%d",&mitjana);
+	
+	while (mitjana>100 || mitjana<2){									//Comprovar si el valor entrat supera el límit estipulat per l'enunciat. En cas que el superi:
+	 	printf("*Valor erroni!*\nSiusplau, torni-ho a intentar: ");		//Notificar a l'usuari que el valor entrat és erroni i se li demana que el torni a entrar.
+		scanf("%d",&mitjana);											
+	 }
+	 
 /************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
 	fd = ConfigurarSerie();
 
@@ -126,50 +138,33 @@ void Param_Marxa(){
 }
 
 void buffer(float variableperguardar){
+	
+
+	float suma=0;
+
 /*******************************************CONFIGURACIÓ BUFFER CIRCULAR ********************************/
 	
-
+	arraycircular[indexEscriure]=variableperguardar;
+	numeroceldas++;
+	indexEscriure++;
 	
-	/*int opcio = 0;										//Variable de prova.
-	while(sortir != true){
-	printf("Entra l'opció, 1 per escriure, 0 per llegir o 2 per sortir.\n");
-	scanf("%d",&opcio);*/
+	printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
 	
-	
-
-	/* Opció escriptura */
-	//if(opcio == 1){
-		//if(modemarxa == true){
-			//printf("Entra numero\n");
-			//scanf("%f",&arraycircular[indexEscriure]);
-			arraycircular[indexEscriure]=variableperguardar;
-			numeroceldas++;
-			indexEscriure++;
-			
-			//printf("Actualment hi ha %d mostres guardades, mostra guardada és %0.2f.\n",numeroceldas, arraycircular[indexEscriure-1]);
-			
-			if(indexEscriure == SIZE_OF_BUFFER){
-				indexEscriure = 0;
-				numeroceldas = numeroceldas -1;
-			}
-		//}
-	//}
-	
-	/*Opció lectura*/
-	/*if(opcio == 0){
-		if(numeroceldas == 0){
-			printf("Buffer buit\n");
-		}
-		printf("Escrigui el valor que vol conèixer\n");
-		scanf("%d", &indexLlegir);
-		printf("El valor emmagatzemat és %d\n",arraycircular[indexLlegir]);
-	}
-	//Opció sortir
-		if(opcio == 2){
-			sortir = true;
-		}*/
+	if(indexEscriure == SIZE_OF_BUFFER){
+		indexEscriure = 0;
+		numeroceldas = numeroceldas -1;
 	}
 /********************************************************************************************************/
+
+		for(int i = indexEscriure -1; i >=(indexEscriure-mitjana); i--){
+			suma=suma + arraycircular[i];
+		}
+		float mitja = suma/mitjana;
+		printf("La mitjana de les ultimes %d mostres és %f.\n", mitjana, mitja);
+
+	
+}
+
 
 
 void demanarmostra(int temps){
@@ -216,13 +211,13 @@ void registremax_min(float temperatura){
 	
 	if (temperatura>max){
 		max=temperatura;
-		printf("El nou màxim és %0.2f\n", max);		
+		//printf("El nou màxim és %0.2f\n", max);		
 	}
 	if (temperatura<min){
 		min=temperatura;
-		printf("El nou mínim és %0.2f\n", min);
+		//printf("El nou mínim és %0.2f\n", min);
 	}
 }
 
 
-	
+
