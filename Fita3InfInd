@@ -61,6 +61,7 @@ void TancarSerie(int);			//Funció que tanca el port sèrie.
 void demanarmostra(int);		//Funció que demana la mostra llegida per l'Arduino.
 void registremax_min(float);		//Funció que emmagatzema els valors màxims i mínims.
 int tiempo();				//Funció que compta segons.
+void blinkingled();			//Funció que fa que el LED 13 s'encengui i s'apagui cada cop que es realitza una lectura.
 
 /********************************************************************************************************************/
 
@@ -94,7 +95,7 @@ void TancarSerie(fd){
 
 void Param_Marxa(){
 	
-	printf("\nEntra el temps de mostreig (1-20s):");				//Es demana el temps de mostreig desitjat.
+	printf("\nEntra el temps de mostreig (1-20s): ");				//Es demana el temps de mostreig desitjat.
 	scanf("%d",&tmostr);								//L'usuari entra el temps de mostreig.
 	
 	while (tmostr>20 || tmostr<1){							//Comprovar si el valor entrat no està inclòs a l'intèrval estipulat per l'enunciat.
@@ -102,7 +103,7 @@ void Param_Marxa(){
 		scanf("%d",&tmostr);											
 	 }
 	
-	printf("\nEntra el nombre de valors dels quals es vol fer la mitjana:");	//Es demana el nombre de valors dels quals es vol fer la mitjana.
+	printf("\nEntra el nombre de valors dels quals es vol fer la mitjana: ");	//Es demana el nombre de valors dels quals es vol fer la mitjana.
 	scanf("%d",&mitjana);								//L'usuari entra el nombre de valors.
 	
 	while (mitjana>100 || mitjana<2){						//Comprovar si el valor entrat no està inclòs a l'intèrval estipulat per l'enunciat.
@@ -153,6 +154,7 @@ void buffer(float variableperguardar){
 	}
 	
 	printf("Actualment hi ha %d mostres guardades de 100, mostra guardada és %0.2fºC\n",numeroceldas, arraycircular[indexEscriure-1]);	//Es notifica a l'usuari el nombre de mostres emmagatzemades i quina ha estat la última.
+	blinkingled();
 	
 	if(indexEscriure == SIZE_OF_BUFFER){
 		indexEscriure = 0;
@@ -163,18 +165,19 @@ void buffer(float variableperguardar){
 			suma=suma + arraycircular[i];						//Fem la suma de les "X" últimes mostres.
 		}
 		float mitja = suma/mitjana;							//Dividim la variable "suma" entre el nombre de temperatures sumades, fent així la mitjana.
-		printf("La mitjana de les ultimes %d mostres és %0.2fºC\n", mitjana, mitja);	//Treiem la informació per pantalla.
+		printf("La mitjana de les últimes %d mostres és %0.2fºC\n", mitjana, mitja);	//Treiem la informació per pantalla.
 
-	
+
+
 }
 
 
 
 void demanarmostra(int temps){
-	/************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
+/************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
 	fd = ConfigurarSerie();
 
-	sprintf(missatge,"ACZ\n");			//Enviem l'ordre de l'Operació 'C'.
+	sprintf(missatge,"ACZ\n");				//Enviem l'ordre de l'Operació 'C'.
 
 	res1 = write(fd,missatge,strlen(missatge));
 
@@ -182,8 +185,8 @@ void demanarmostra(int temps){
 
 		
 	sleep(1);
-	res1 = read(fd,buf,1); 							//Cal rebre d'un byte en un byte perquè newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
-	res1 = res1 + read(fd,buf+1,1);						//Rebem de l'Arduino 7 bytes.
+	res1 = read(fd,buf,1); 			//Cal rebre d'un byte en un byte perquè newtio.c_cc[VMIN] = 1 A ConfigurarSerie(void)
+	res1 = res1 + read(fd,buf+1,1);		//Rebem de l'Arduino 7 bytes.
 	res1 = res1 + read(fd,buf+2,1);
 	res1 = res1 + read(fd,buf+3,1);
 	res1 = res1 + read(fd,buf+4,1);
@@ -192,39 +195,40 @@ void demanarmostra(int temps){
 
 		
 		
-	int milers = buf[3]-'0';						//Convertim les dades comunicades de char a integer.
+	int milers = buf[3]-'0';		//Convertim les dades comunicades de char a integer.
 	int centenes = buf[4]-'0';
 	int desenes = buf[5]-'0';
 	int unitats = buf[6]-'0';
 	
-	int temperatura = milers*1000+centenes*100+desenes*10+unitats;		//Formem una mateixa dada, que va de 0 a 1023.
-
-	float temperaturaengraus = (temperatura*70)/1023;			//Convertim la dada rebuda de l'Arduino a graus centígrads.
-	printf("Hem rebut %d, que correspòn a  %0.2f ºC\n",temperatura, temperaturaengraus);
+	int temperatura = milers*1000+centenes*100+desenes*10+unitats;					//Formem una mateixa dada, que va de 0 a 1023.
 	
-
-	buffer(temperaturaengraus);				//La temperatura, ja convertida a graus centígrads s'envia a la funció "buffer()" per emmagatzemar-la.
-	registremax_min(temperaturaengraus);			//La temperatura, ja convertida a graus centígrads s'envia a la funció "registremax_min", per actualitzar, si cal, els regístres de temperatura màxima i mínima.
-
-	
-	TancarSerie(fd);	
+	if(temperatura<1024){
+		float temperaturaengraus = (temperatura*70)/1023;					//Convertim la dada rebuda de l'Arduino a graus centígrads.
+		printf("Hem rebut %d, que correspòn a  %0.2f ºC\n",temperatura, temperaturaengraus);
+		buffer(temperaturaengraus);								//La temperatura, ja convertida a graus centígrads s'envia a la funció "buffer()" per emmagatzemar-la.
+		registremax_min(temperaturaengraus);							//La temperatura, ja convertida a graus centígrads s'envia a la funció "registremax_min", per actualitzar, si cal, els regístres de temperatura màxima i mínima.
+		TancarSerie(fd);
+	}else{
+		printf("Hi ha hagut un error en la comunicació sèrie, ho tornem a intentar, disculpi les molèsties\n");
+		demanarmostra(temps);
+	}
 }
 
 void registremax_min(float temperatura){
 
 	
-	if (temperatura>max){					//En cas de ser la nova temperatura superior a la que fins ara havia estat considerada com a màxima, esdevé la nova temperatura màxima.
+	if (temperatura>max){							//En cas de ser la nova temperatura superior a la que fins ara havia estat considerada com a màxima, esdevé la nova temperatura màxima.
 		max=temperatura;
 		printf("El nou màxim és %0.2fºC\n", max);		
 	}
-	if (temperatura<min){					//En cas de ser la nova temperatura inferior a la que fins ara havia estat considerada com a mínima, esdevé la nova temperatura mínima.
+	if (temperatura<min){							//En cas de ser la nova temperatura inferior a la que fins ara havia estat considerada com a mínima, esdevé la nova temperatura mínima.
 		min=temperatura;
 		printf("El nou mínim és %0.2fºC\n", min);
 	}
 }
 
-int tiempo(){							//Aquesta funció compta segons, està configurada per treure per pantalla el nombre de segons que va comptant, quan arriba al temps estipulat per "tmostr",
-								//finalitza la seva execució, permetent així l'execució de la funció "demanarmostra()".
+int tiempo(){						//Aquesta funció compta segons, està configurada per treure per pantalla el nombre de segons que va comptant, quan arriba al temps estipulat per "tmostr",
+							//finalitza la seva execució, permetent així l'execució de la funció "demanarmostra()".
 	clock_t t,ts;
 	int segundos=0;
 	ts=clock()+CLOCKS_PER_SEC;
@@ -238,5 +242,25 @@ int tiempo(){							//Aquesta funció compta segons, està configurada per treur
 		}
 	}
 	return segundos;
+}
+
+void blinkingled(){
+	/******************************* FEM QUE EL LED FACI UNA PULSACIÓ ****************************************/
+	fd = ConfigurarSerie();
+
+	sprintf(missatge,"AS131Z\n");								//Enviem l'ordre de l'Operació 'S' per encendre el LED 13.
+
+	res1 = write(fd,missatge,strlen(missatge));
+
+	if (res1 <0) {tcsetattr(fd,TCSANOW,&oldtio); perror(MODEMDEVICE); exit(-1); }
+
+
+	
+	sprintf(missatge,"AS130Z\n");								//Enviem l'ordre de l'Operació 'S' per a que el LED 13 s'apagui.
+	res1 = write(fd,missatge,strlen(missatge));
+	if (res1 <0) {tcsetattr(fd,TCSANOW,&oldtio); perror(MODEMDEVICE); exit(-1); }
+	
+	TancarSerie(fd);
+/********************************************************************************************************/
 }
 
