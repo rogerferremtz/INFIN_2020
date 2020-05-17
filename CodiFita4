@@ -49,9 +49,7 @@ int indexEscriure = 0;							//Índex al punter d'escriptura.
 int numeroceldas = 0;							//Nombre de valors en el buffer circular.
 float max=0;									//Variable que emmagatzema el valor màxim de temperatura mesurat.
 float min=70;									//Variable que emmagatzema el valor mínim de temperatura mesurat.
-//int mitjana=0;									//Variable que emmagatzema el nombre de temperatures del quals es vol fer la mitjana.
 struct termios oldtio,newtio;   				//Estructura del codi per comunicar amb l'arduino.
-
 int temps = 0;
 int mostres = 0;
 
@@ -75,7 +73,7 @@ void* codi_fill(void* parametre){ 										// Codi thread fill.
 
 /***************************************************************************** EXECUCIÓ THREAD FILL ********************************************************/
 
-	//printf("Thread fill PID(%d), executant-se\n",getpid());
+	printf("Thread fill PID(%d), executant-se\n",getpid());
 	//sleep(2); // Retard de 2 segons
 
 		Param_Marxa(temps, mostres);	
@@ -131,7 +129,7 @@ int main(int argc, char *argv[]){
 
 			/*Esperar conexió. sFd: socket pare, newFd: socket fill*/
 			newFd=accept(sFd, (struct sockaddr *) &clientAddr, &sockAddrSize);
-			printf("Connexión acceptada del client: adreça %s, port %d\n",	inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+			printf("Connexió acceptada del client: adreça %s, port %d\n",	inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
 
 			/*Rebre*/
 			memset( buffer, 0, 256 );
@@ -155,6 +153,7 @@ int main(int argc, char *argv[]){
 							
 							switch(buffer[2]){
 								case '0':																	//Client vol PARADA
+									modemarxa = false;														//Deshabilitem la variable de mode MARXA.
 									memset(buffer,0,strlen(buffer));										//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 									memset(missatge,0,strlen(missatge));									//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 									strcpy(missatge,"{M0}\n");												//Escrivim el que volem retornar al client al char "missatge".
@@ -169,7 +168,7 @@ int main(int argc, char *argv[]){
 									temps = desenes*10 + unitats;
 									mostres = buffer[5]-'0';																			//Convertim el nombre de mostres rebudes a enter.
 									printf("El temps de mostratge és %d, i el nombre de mostres per la mitjana és %d.\n",temps, mostres);	//Treiem per la cònsola la informació rebuda del client.
-									
+									modemarxa = true;										//Establim que estem en mode 'MARXA'.
 									//printf("Proces pare 1 PID(%d) \n",getpid() );
 									pthread_create(&thread, NULL, codi_fill, 0); 			//Es crea el thread fill.
 									//printf("Proces pare 2 PID(%d) \n",getpid() );			// Proces Pare.
@@ -211,7 +210,7 @@ int main(int argc, char *argv[]){
 							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{U0%3.1f}\n",mostramesantiga);
+							sprintf(str, "{U0%05.1f}\n",mostramesantiga);
 							strcpy(missatge,str);																	
 							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
 							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
@@ -232,7 +231,7 @@ int main(int argc, char *argv[]){
 							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{X0%3.1f}\n",max);
+							sprintf(str, "{X0%05.1f}\n",max);
 							strcpy(missatge,str);																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
 							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
 							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
@@ -253,7 +252,7 @@ int main(int argc, char *argv[]){
 							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{Y0%3.1f}\n",min);
+							sprintf(str, "{Y0%05.1f}\n",min);
 							strcpy(missatge,str);																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
 							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
 							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
@@ -357,9 +356,7 @@ void TancarSerie(fd){
 }
 
 void Param_Marxa(int tmostr, int mitjana){
-	
-	printf("Temps %d, mostres %d\n", tmostr, mitjana);
-	 
+ 
 /************************* CODI COMUNICACIÓ RASPBERRY PI AMB ARDUINO*************************************/	
 	fd = ConfigurarSerie();
 
@@ -377,8 +374,7 @@ void Param_Marxa(int tmostr, int mitjana){
 	
 	printf("\n");
 	
-	modemarxa = true;					//Establim que estem en mode 'MARXA'.
-	
+		
 	while(modemarxa==true){				//Sempre que estiguem en mode marxa, cridem la funció "tiempo()", que compta segons.
 		int segons = tiempo();			
 		if(segons == tmostr){
@@ -452,14 +448,14 @@ void demanarmostra(int temps){
 	
 	int temperatura = milers*1000+centenes*100+desenes*10+unitats;									//Formem una mateixa dada, que va de 0 a 1023.
 	
-	if(temperatura<1024){
+	if(temperatura<1024 && temperatura>-1){
 		float temperaturaengraus = (temperatura*70)/1023;											//Convertim la dada rebuda de l'Arduino a graus centígrads.
-		printf("Hem rebut %d, que correspòn a  %0.2f ºC\n",temperatura, temperaturaengraus);
+		printf("\nHem rebut %d, que correspòn a  %0.2f ºC\n",temperatura, temperaturaengraus);
 		buffer(temperaturaengraus);																	//La temperatura, ja convertida a graus centígrads s'envia a la funció "buffer()" per emmagatzemar-la.
 		registremax_min(temperaturaengraus);														//La temperatura, ja convertida a graus centígrads s'envia a la funció "registremax_min", per actualitzar, si cal, els regístres de temperatura màxima i mínima.
 		TancarSerie(fd);
 	}else{
-		printf("Hi ha hagut un error en la comunicació sèrie, ho tornem a intentar, disculpi les molèsties\n");
+		printf("\nHi ha hagut un error en la comunicació sèrie, ho tornem a intentar, disculpi les molèsties\n");
 		demanarmostra(temps);
 	}
 }
