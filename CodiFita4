@@ -31,9 +31,8 @@
 #define MODEMDEVICE "/dev/ttyACM0"      //Conexió directa PC(Linux) - Arduino.
 #define _POSIX_SOURCE 1 				// POSIX compliant source.
 
-/*************************/
-//int tmostr;								//Temps de mostratge entrat per la consola.
-/*************************/
+pthread_mutex_t lock;					//Hablilitem el poder fer Mutex en el tracte de variables de l'array.
+
 bool modemarxa = true;					//Variable booleana que ens indica si l'Arduino està llegint dades.
 int fd, i = 0, res, res1, res2;         //Variables usades per saber el nombre de bytes que ens comunica l'Arduino.                                                
 char buf[255];							//Array de chars on s'emmagatzema el valor rebut de l'Arduino.
@@ -50,8 +49,8 @@ int numeroceldas = 0;							//Nombre de valors en el buffer circular.
 float max=0;									//Variable que emmagatzema el valor màxim de temperatura mesurat.
 float min=70;									//Variable que emmagatzema el valor mínim de temperatura mesurat.
 struct termios oldtio,newtio;   				//Estructura del codi per comunicar amb l'arduino.
-int temps = 0;
-int mostres = 0;
+int temps = 0;									//Temps de mostratge rebut del client.
+int mostres = 0;								//Nombre de mostres per fer la mitjana rebut del client.
 
 
 /*******************************Prototipus de les funcions***********************************************************/
@@ -76,7 +75,7 @@ void* codi_fill(void* parametre){ 										// Codi thread fill.
 	printf("Thread fill PID(%d), executant-se\n",getpid());
 	//sleep(2); // Retard de 2 segons
 
-		Param_Marxa(temps, mostres);	
+		Param_Marxa(temps, mostres);							//Aquest és el "main" de la Fita 3.
 
 
 /***********************************************************************************************************************************************************/
@@ -140,12 +139,11 @@ int main(int argc, char *argv[]){
 				switch (buffer[1]){
 					case 'M':
 						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							
 							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							strcpy(missatge,"{M1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de char "missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 							
@@ -157,30 +155,17 @@ int main(int argc, char *argv[]){
 									memset(buffer,0,strlen(buffer));										//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 									memset(missatge,0,strlen(missatge));									//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 									strcpy(missatge,"{M0}\n");												//Escrivim el que volem retornar al client al char "missatge".
-									strcpy(buffer,missatge);												//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-									result = write(newFd, buffer, strlen(buffer)+1); 						//+1 per enviar el 0 final de cadena
+									strcpy(buffer,missatge);												//Escrivim el que haviem posat al array de char "missatge" al array "buffer".
+									result = write(newFd, buffer, strlen(buffer)+1); 						//+1 per enviar el 0 final de cadena.
 									printf("Missatge enviat a client(bytes %d): %s\n",	result, buffer);
 									result = close(newFd);
 								break;
 								case '1':																									//Client vol MARXA
-									desenes = buffer[3]-'0';																			//Convertim els valors de temps rebuts a enters.
+									desenes = buffer[3]-'0';																				//Convertim els valors de temps rebuts a enters.
 									unitats = buffer[4]-'0';
 									temps = desenes*10 + unitats;
-									mostres = buffer[5]-'0';																			//Convertim el nombre de mostres rebudes a enter.
-									printf("El temps de mostratge és %d, i el nombre de mostres per la mitjana és %d.\n",temps, mostres);	//Treiem per la cònsola la informació rebuda del client.
-									modemarxa = true;										//Establim que estem en mode 'MARXA'.
-									//printf("Proces pare 1 PID(%d) \n",getpid() );
-									pthread_create(&thread, NULL, codi_fill, 0); 			//Es crea el thread fill.
-									//printf("Proces pare 2 PID(%d) \n",getpid() );			// Proces Pare.
-									
-									memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-									memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-									strcpy(missatge,"{M0}\n");																				//Escrivim el que volem retornar al client al char "missatge".
-									strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-									result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
-									printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
-									result = close(newFd);
-									
+									mostres = buffer[5]-'0';																				//Convertim el nombre de mostres rebudes a enter.
+																	
 									if(temps < 1 || temps > 20 || mostres < 1 || mostres > 9){												//Mirem que no hi hagi un ERROR de tipus 2.
 										memset(buffer,0,strlen(buffer));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
 										memset(missatge,0,strlen(missatge));																//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
@@ -189,122 +174,143 @@ int main(int argc, char *argv[]){
 										result = write(newFd, buffer, strlen(buffer)+1);													//+1 per enviar el 0 final de cadena
 										printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 										result = close(newFd);
+									} else{
+										printf("El temps de mostratge és %d, i el nombre de mostres per la mitjana és %d.\n",temps, mostres);	//Treiem per la cònsola la informació rebuda del client.
+										modemarxa = true;																						//Establim que estem en mode 'MARXA'.
+										//printf("Proces pare 1 PID(%d) \n",getpid() );
+										pthread_create(&thread, NULL, codi_fill, 0); 															//Creem el thread fill.
+										
+										pthread_mutex_init(&lock, NULL);																		//Inicialitzem el Mutex.
+										
+										//printf("Proces pare 2 PID(%d) \n",getpid() );	// Proces Pare.
+										
+										memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+										memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+										strcpy(missatge,"{M0}\n");																				//Escrivim el que volem retornar al client al char "missatge".
+										strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de char "missatge" al array "buffer".
+										result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena.
+										printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
+										result = close(newFd);
 									}
 									
 								break;
 								}
 							}
 					break;
-					case 'U':  																										//Client vol MOSTRA MÉS ANTIGA
-						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-							strcpy(missatge,"{U1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+					case 'U':  																							//Client vol consultar la MOSTRA MÉS ANTIGA.
+						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){												//Mirem que no hi hagi un ERROR de tipus 1.
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							strcpy(missatge,"{U1}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}else if(buffer[0] == '{' && buffer[bufferlen-1] == '}'){
 							float mostramesantiga = arraycircular[indexLlegir];
-							indexLlegir++;
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							if(indexLlegir < SIZE_OF_BUFFER){
+								indexLlegir++;
+							}else if(indexLlegir == SIZE_OF_BUFFER){
+								indexLlegir = 0;
+							}
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{U0%05.1f}\n",mostramesantiga);
+							sprintf(str, "{U0%05.1f}\n",mostramesantiga);												//La mostra més antiga la treiem en format de 5 dígits enters i 1 decimal.
 							strcpy(missatge,str);																	
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}
 					break;
-					case 'X':  																										//Client vol la TEMPERATURA MÀXIMA
-						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-							strcpy(missatge,"{X1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+					case 'X':  																							//Client vol la TEMPERATURA MÀXIMA.
+						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){												//Mirem que no hi hagi un ERROR de tipus 1.
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							strcpy(missatge,"{X1}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}else if(buffer[0] == '{' && buffer[bufferlen-1] == '}'){
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{X0%05.1f}\n",max);
-							strcpy(missatge,str);																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							sprintf(str, "{X0%05.1f}\n",max);															//La mostra la treiem en format de 5 dígits enters i 1 decimal.
+							strcpy(missatge,str);																		//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}
 					break;
-					case 'Y': 																										//Client vol la TEMPERATURA MÍNIMA
-						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-							strcpy(missatge,"{Y1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+					case 'Y': 																							//Client vol la TEMPERATURA MÍNIMA.
+						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){												//Mirem que no hi hagi un ERROR de tipus 1.
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							strcpy(missatge,"{Y1}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}else if(buffer[0] == '{' && buffer[bufferlen-1] == '}'){
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{Y0%05.1f}\n",min);
-							strcpy(missatge,str);																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							sprintf(str, "{Y0%05.1f}\n",min);															//La mostra més antiga la treiem en format de 5 dígits enters i 1 decimal.
+							strcpy(missatge,str);																		//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena
 							printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}
 					break;
-					case 'R':  																										//Client vol fer RESET MÁXIM I MÍNIM
-						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-							strcpy(missatge,"{R1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+					case 'R':  																							//Client vol fer RESET MÁXIM I MÍNIM.
+						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){												//Mirem que no hi hagi un ERROR de tipus 1.
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							strcpy(missatge,"{R1}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}else if(buffer[0] == '{' && buffer[bufferlen-1] == '}'){
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							min = 70;
 							max = 0;
-							strcpy(missatge,"{R0}\n");																		//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							strcpy(missatge,"{R0}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}
 					break;
-					case 'B':  																										//Client vol el NOMBRE DE MOSTRES EMMAGATZEMADES
-						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){															//Mirem que no hi hagi un ERROR de tipus 1.
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
-							strcpy(missatge,"{B1}\n");																				//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+					case 'B':  																							//Client vol el NOMBRE DE MOSTRES EMMAGATZEMADES.
+						if(buffer[0] != '{' || buffer[bufferlen-1] != '}'){												//Mirem que no hi hagi un ERROR de tipus 1.
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							strcpy(missatge,"{B1}\n");																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Error de paràmetres, missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}else if(buffer[0] == '{' && buffer[bufferlen-1] == '}'){
-							memset(buffer,0,strlen(buffer));																		//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
-							memset(missatge,0,strlen(missatge));																	//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
+							memset(buffer,0,strlen(buffer));															//Posem un '0' a totes per posicions de l'array de chars anomenat "buffer".
+							memset(missatge,0,strlen(missatge));														//Posem un '0' a totes per posicions de l'array de chars anomenat "missatge".
 							char str[20];
-							sprintf(str, "{B0%04d}\n",numeroceldas);
-							strcpy(missatge,str);																	//Escrivim el missatge d'error que volem retornar al client al char "missatge".
-							strcpy(buffer,missatge);																				//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
-							result = write(newFd, buffer, strlen(buffer)+1);														//+1 per enviar el 0 final de cadena
+							sprintf(str, "{B0%04d}\n",numeroceldas);													//El nombre de mostres emmagatzemades el treiem en format de 4 nombres.
+							strcpy(missatge,str);																		//Escrivim el missatge d'error que volem retornar al client al char "missatge".
+							strcpy(buffer,missatge);																	//Escrivim el que haviem posat al array de chars"missatge" al array "buffer".
+							result = write(newFd, buffer, strlen(buffer)+1);											//+1 per enviar el 0 final de cadena.
 							printf("Missatge enviat a client(bytes %d): %s\n",result, buffer);
 							result = close(newFd);
 						}
 					break;
 					default:
-						strcpy(buffer, "{E1}\n");
-						result = write(newFd, buffer, strlen(buffer) + 1); //+1 per enviar el 0 final de cadena
+						strcpy(buffer, "{E1}\n");																		//En cas de no haver rebut una comanda clara del client, informem d'un error.
+						result = write(newFd, buffer, strlen(buffer) + 1); 												//+1 per enviar el 0 final de cadena.
 						printf("L'instruccio rebuda no es reconeix\n");
 						strcpy(missatge, "Error instrucció\n");
 						printf("Missatge enviat a client(bytes %d): %s\n", result, missatge);
@@ -325,6 +331,7 @@ int main(int argc, char *argv[]){
 /************************************************************************************************************************************************************/
 
 	pthread_join(thread, NULL);
+	pthread_mutex_destroy(&lock);																						//Destruïm el Mutex que abans hem inicialitzat.
 	//printf("Proces pare PID(%d)\n",getpid());
 	return EXIT_SUCCESS;
 }
@@ -388,10 +395,10 @@ void Param_Marxa(int tmostr, int mitjana){
 void buffer(float variableperguardar){
 	
 
-	float suma=0;						//Variable que emmagatzema la suma de les "X" temperatures de les quals volem fer la mitjana.
+	float suma=0;															//Variable que emmagatzema la suma de les "X" temperatures de les quals volem fer la mitjana.
 
 /*******************************************CONFIGURACIÓ BUFFER CIRCULAR ********************************/
-	
+	pthread_mutex_lock(&lock);												//Bloquejem amb un Mutex l'accés a la variable de l'array circular que s'està emmagatzemant en aquest moment, així evitem inconsistències de dades.
 	arraycircular[indexEscriure]=variableperguardar;
 	indexEscriure++;
 	if(numeroceldas != SIZE_OF_BUFFER){
@@ -404,6 +411,7 @@ void buffer(float variableperguardar){
 	if(indexEscriure == SIZE_OF_BUFFER){
 		indexEscriure = 0;
 	}
+	pthread_mutex_unlock(&lock);											//Un cop la variable ja ha estat emmagatzemada al array circular, desbloquejem el Mutex.
 /********************************************************************************************************/
 
 		for(int i = indexEscriure -1; i >=(indexEscriure-mostres); i--){
@@ -473,8 +481,8 @@ void registremax_min(float temperatura){
 	}
 }
 
-int tiempo(){										//Aquesta funció compta segons, està configurada per treure per pantalla el nombre de segons que va comptant, quan arriba al temps estipulat per "tmostr",
-													//finalitza la seva execució, permetent així l'execució de la funció "demanarmostra()".
+int tiempo(){									//Aquesta funció compta segons, està configurada per treure per pantalla el nombre de segons que va comptant, quan arriba al temps estipulat per "tmostr",
+										//finalitza la seva execució, permetent així l'execució de la funció "demanarmostra()".
 	clock_t t,ts;
 	int segundos=0;
 	ts=clock()+CLOCKS_PER_SEC;
